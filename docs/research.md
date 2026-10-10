@@ -1,288 +1,289 @@
 # The Earthen Shrink: Research Notes (Step 1)
 
-Research date: **October 9, 2026**. The game is in **beta**, so numbers change often.
+First written: October 9, 2026. **Re-checked: October 10, 2026**, after Angel asked that every fact be verified for **WoW Forever** specifically.
+
+The game is in **beta**, so numbers change often.
 
 ## How to read this document
 
-Every fact has a tag so you know how much to trust it:
+**Rule we follow:** only information about **World of Warcraft: Forever** counts as a fact. Classic, TBC or retail information is never listed as a fact. If we must borrow an old Classic rule to make the math work, it is tagged 🔶 and will be tested in game before the addon relies on it.
 
 | Tag | Meaning |
 |-----|---------|
-| ✅ **Official** | Blizzard said it (patch notes, official posts). |
-| 🟡 **Community** | Guide sites or testers report it, but Blizzard has not confirmed it. |
-| 🔶 **Classic guess** | Not known for Forever yet. We borrow the old Classic (Vanilla) value as a starting point. |
-| ❓ **Unknown** | Nobody has published this yet. We will measure it in game. |
+| ✅ **Blizzard** | Blizzard said it about Forever (official posts or BlizzCon panel). |
+| ☑️ **2 sources** | Two separate Forever guide sites agree. Likely right, but not from Blizzard. |
+| 🟡 **1 source** | Only one Forever guide site says it. Needs a tooltip check by Angel. |
+| 🔶 **Classic rule** | NOT verified for Forever. Old Classic value, used only as a placeholder in the math until we test it. |
+| ❓ **Unknown** | Nobody has published this. We will measure it in game. |
+| 🧪 **Angel to check** | Angel can confirm this from a tooltip or screenshot in the beta. See [Section 8](#8-screenshot-checklist-for-angel). |
 
 Words in **bold** the first time are explained in the [Glossary](#glossary) at the bottom.
+
+### What changed in the October 10 re-check
+
+- **Haste removed as a gear stat.** Angel was right. Two Forever guides say no gear in the beta has haste ([Warcraft Tavern stats guide](https://www.warcrafttavern.com/forever/guides/stats/), [WoW Forever Builds](https://wowforeverbuilds.com/news/wow-forevers-character-panel-now-explains-your-stats-and-missed-loot-turns-up-in)). Haste only comes from a few effects, like the Troll racial Berserking and the Skyborne racial Wind Blessed.
+- **Removed a stat priority list that included haste.**
+- **Fixed talent numbers** that were written wrong: Maelstrom Weapon, Mental Dexterity, Mental Quickness, Lightning Overload, Mindfulness (now checked against a second Forever source).
+- **Stopped using sources that weren't specific to Forever.** One expertise article mostly described TBC and WotLK numbers, so it's gone.
+- **Every number now has a trust tag.** Numbers from only one site are marked 🟡 and added to Angel's screenshot checklist.
 
 ---
 
 ## 1. What is WoW Forever?
 
 - ✅ A new, third version of WoW in the Battle.net app, next to "Modern" (retail) and "Classic". The beta installs as **"World of Warcraft: Forever Beta"**.
-- ✅ The gameplay is based on **Vanilla** (the original 2004 game), with many class redesigns. So Shamans have no Bloodlust or Hex.
-- ✅ Dwarves can now be Shamans, so both factions (Alliance and Horde) have them.
-- 🟡 The beta level cap started at 20, then went to 30. The full game goes to 60.
-- ✅ Talents work like old Classic trees, with new "gold medal" talents at 11, 16, 21 and 31 points. Dual Specialization (two saved talent setups) unlocks at level 40.
+- ✅ The gameplay is based on **Vanilla** (the original 2004 game), with class redesigns. Shamans have no Bloodlust or Hex.
+- ☑️ Dwarves can be Shamans, so both factions have them.
+- ☑️ The beta level cap started at 20, then went to 30.
+- ✅ Talents use Classic-style trees, with special "gold medal" talents at 11, 16, 21 and 31 points. Dual Specialization unlocks at level 40.
 
-**Big surprise for addon makers:** the game *plays* like Classic, but the *addon code* works like modern retail WoW. This changes how we build everything (see Section 6).
+**Big surprise for addon makers:** the game *plays* like Classic, but the *addon code* works like modern retail WoW. See Section 6.
 
 ---
 
-## 2. Stats: what they do
+## 2. Stats
 
-Forever changed how stats work compared to Classic:
+### What Forever changed
 
-- ✅ **Hit chance** is now one stat for everything (melee, spells, totems). Classic had separate melee hit and spell hit.
+- ✅ **Hit chance** is one stat for everything (melee, spells, ranged). Classic had separate ones. (Blizzard at BlizzCon, reported by [OutputLag](https://outputlag.com/news/world-of-warcraft-forever-unifies-hit-and-crit-stats-and-gives-healing-gear-bonus-damage/).)
 - ✅ **Crit chance** is also one stat for everything.
-- ✅ Every healing item also gives some spell damage (for example "up to 42 healing and 14 damage").
+- ✅ Every healing item also gives some spell damage.
 - ✅ Caster weapons give spell damage from level 10 onward.
-- ✅ A new stat lowers the enemy's chance to dodge or parry your melee hits. Guides call it **Expertise**, but Blizzard has not confirmed the name. 🟡
-- 🟡 **Haste** (casting and attacking faster) is a new stat. How much haste you get per point is ❓.
-- ✅ **Weapon skill** still exists, but items give less of it.
-- 🟡 Spell power now comes mainly from gear, instead of from higher spell ranks.
+- ✅ **Weapon skill** still exists, but one item gives less of it.
+- ✅ A new effect lowers the enemy's chance to dodge or parry your melee hits (seen on Edgemaster's Handguards as "1%"). Blizzard has **not** confirmed the name "Expertise".
+- ☑️ **Haste is not a gear stat** in the beta. It only comes from effects like Berserking (Troll) and Wind Blessed (Skyborne). 🧪
+- ☑️ The character panel shows one combined Crit Chance, and hovering a stat explains what it does for your class. 🧪 *This tooltip is the best way to verify stat conversions.*
 
-### Stat values per point
+### Stat conversions
 
-| Stat | What 1 point gives | Trust |
+Only one Forever guide ([Warcraft Tavern](https://www.warcrafttavern.com/forever/guides/stats/)) lists these, and it does not say they were tested in Forever. Some look copied from Classic. **All need checking from the character panel tooltips.** 🧪
+
+| Stat | What 1 point gives a Shaman | Trust |
 |------|-------------------|-------|
-| Intellect | 15 mana, plus a little spell crit | 🟡 (Icy Veins) |
-| Stamina | 10 health | 🔶 |
-| Strength | 2 attack power (Shaman) | 🔶 |
-| Agility | A little melee crit (about 1% per 20 Agility at level 60) | 🔶 |
-| Spirit | Mana regen when you have not cast for 5 seconds | 🔶 |
-| MP5 | Mana every 5 seconds, always, even while casting | 🔶 |
-| Intellect to crit | About 1% spell crit per 59.5 Intellect at level 60 | 🔶 |
+| Intellect | 15 max mana | ☑️ (Icy Veins and Warcraft Tavern agree) |
+| Intellect | Spell crit: about 1% per 54 to 60 Intellect | 🟡 🧪 |
+| Agility | Melee crit: 1% per 20 Agility | 🟡 🧪 |
+| Strength | 2 attack power | 🟡 🧪 |
+| Stamina | 10 health | 🟡 🧪 |
+| Attack power | 14 attack power = +1 DPS | 🟡 🧪 |
+| Spirit | Mana regen while not casting. No number published. | ❓ 🧪 |
 
-**Good news:** we don't have to know all of these formulas. The game can tell the addon the *final* numbers directly (your total crit %, total spell power, total attack power, and so on). See Section 6. We only need formulas for "what if" questions, like "what if I had 10 more Intellect?"
+**Good news:** the addon doesn't need most of these formulas. The game tells the addon your *final* totals (crit %, spell power, attack power) directly. We only need the formulas for "what if I had 10 more Intellect?" questions.
 
-### Stat priority (what to collect first)
+### Stat priority
 
-These are what guide sites say right now. All are 🟡 and change as people test.
+These are guide opinions, and they disagree. Haste is left out because it isn't on gear.
 
 | Spec | Priority (best first) | Source |
 |------|------------------------|--------|
-| Elemental | Spell Power > Crit > Hit > Intellect > MP5 > Spirit > Stamina | Icy Veins |
-| Elemental (other view) | Spell Power > Hit > Haste > Intellect > Crit | Warcraft Tavern |
-| Enhancement | Weapon Damage > Hit/Expertise > Crit > Strength > Intellect > Agility > Spell Power | wow.gg ("largely guesswork") |
-| Restoration | Healing Power > Crit > Intellect > Spirit > MP5 > Stamina | Icy Veins |
+| Elemental | Spell Power > Crit > Hit > Intellect > MP5 > Spirit > Stamina | 🟡 [Icy Veins](https://www.icy-veins.com/wow-forever/elemental-shaman-ranged-dps-pve-guide) |
+| Enhancement | Weapon Damage > Hit and dodge/parry reduction > Crit > Strength > Intellect > Agility > Spell Power | 🟡 [wow.gg](https://wow.gg/guides/wow-forever-enhancement-shaman-beta) (their own words: "largely guesswork") |
+| Restoration | Healing > Crit > Intellect > Spirit > MP5 > Stamina | 🟡 [Icy Veins](https://www.icy-veins.com/wow-forever/restoration-shaman-healer-pve-guide) |
 
-The guides disagree. That is exactly why our addon should calculate stat priority from **your** gear instead of using a fixed list.
+This is why the addon should calculate stat priority from **your** gear instead of copying a list.
 
 ---
 
 ## 3. The three specs
 
+Talent descriptions are from Blizzard's [Mage and Shaman deep dive](https://worldofwarcraft.blizzard.com/en-us/news/24302097) (✅). Blizzard mostly didn't give percentages, so the numbers come from guide sites and carry their own tags.
+
 ### Elemental (casting damage)
 
-- ✅ **Lightning Bolt** (rank 4 and up): cast time is 2.5 seconds (was 3.0). Its spell power bonus was lowered to match.
-- ✅ **Chain Lightning**: cast time is 2.0 seconds (was 2.5).
+- ✅ **Lightning Bolt** (rank 4 and up): 2.5 second cast (was 3.0). Its spell power bonus was lowered to match.
+- ✅ **Chain Lightning**: 2.0 second cast (was 2.5). Spell power bonus lowered to match.
 - ✅ **Lava Burst** (31-point talent): 2.5 second cast, 10 second cooldown, 20% more damage if your Flame Shock is on the target.
-- ✅ **Fire Nova** is now a spell (not a totem). It explodes around your current Fire Totem. 🟡 10 second cooldown.
-- ✅ **Lightning Overload**: chance for Lightning Bolt or Chain Lightning to fire a free second copy at half damage. 🟡 3% chance per point.
+- ✅ **Fire Nova** is a spell now, not a totem. It explodes around your current Fire Totem.
+- ✅ **Lightning Overload**: chance for Lightning Bolt or Chain Lightning to cast a free copy at half damage. ☑️ 3% / 6% / 10% chance at ranks 1 / 2 / 3.
 - ✅ **Call of Thunder** (16-point talent): +3% crit for Lightning Bolt and Chain Lightning.
-- 🟡 **Elemental Fury**: +20% crit damage (Classic was +100%).
-- 🟡 **Elemental Focus**: 10% chance that your next damage spell costs no mana (called Clearcasting).
-- 🟡 **Convection**: 2% less mana per point, now also for Lava Burst.
+- ✅ **Elemental Alacrity**: up to 0.5 seconds faster Lightning Bolt and Chain Lightning at max rank (3 points).
+- ✅ **Elemental Fury** moved to row 6. 🟡 Crit damage bonus: +20%. 🧪
+- ✅ **Convection** also reduces Lava Burst's cost. 🟡 2% per point. 🧪
+- ✅ **Elemental Focus**: lower chance when you cast low ranks. 🟡 10% chance for a free spell. 🧪
 - ✅ **Elemental Mastery** was removed.
 
-🟡 Basic rotation (Icy Veins): put totems down, pull with Lightning Bolt, Fire Nova on 3+ enemies, Flame Shock, then Lightning Bolt until the target dies. With Lava Burst: Flame Shock first, then Lava Burst.
+🟡 Rotation from Icy Veins: totems down, pull with Lightning Bolt, Fire Nova on 3+ enemies, Flame Shock, then Lightning Bolt.
 
 ### Enhancement (melee and spells mixed)
 
-- ✅ **Stormstrike** (16-point talent): 8 second cooldown (was 20). Your next Lightning Bolt, Chain Lightning, or Earth Shock does 20% more damage.
-- ✅ **Maelstrom Weapon**: melee hits build stacks that make Lightning Bolt faster. 🟡 Up to 5 stacks, each one is 4% faster and 4% cheaper.
-- ✅ **Mental Dexterity**: gives attack power from Intellect. 🟡 33% of your Intellect.
-- ✅ **Mental Quickness**: gives spell damage from Intellect. 🟡 Up to 15% of your Intellect.
-- ✅ **Shamanistic Focus** (11-point talent): Shocks and Lightning Shield cost much less mana. 🟡 45% less.
-- ✅ **Flurry**: up to 25% faster attacks after a crit (was 30%).
+- ✅ **Stormstrike** (16-point talent): 8 second cooldown. Your next Lightning Bolt, Chain Lightning, or Earth Shock does 20% more damage.
+- ✅ **Maelstrom Weapon**: melee hits can give stacks that make Lightning Bolt faster. With enough ranks and stacks, it becomes instant. ☑️ Up to 5 stacks. Each stack lowers cast time and mana cost by 4% per talent rank (so 20% per stack at rank 5, and 5 stacks = instant). 🧪
+- ✅ **Mental Dexterity**: attack power from Intellect. 🟡 33% / 66% / 100% of your Intellect at ranks 1 / 2 / 3. 🧪
+- ✅ **Mental Quickness**: spell power from Intellect. 🟡 15% / 30% of your Intellect at ranks 1 / 2. 🧪
+- ✅ **Shamanistic Focus** (11-point talent): Shocks and Lightning Shield cost much less. ☑️ 45% less.
+- ✅ **Flurry**: up to 25% faster attacks (was 30%).
 - ✅ **Rage of the Farseer** (31-point talent): 30% faster attacks for 25 seconds, 3 minute cooldown.
-- ✅ Two-handed axes and maces are now available without a talent.
+- ✅ Two-handed axes and maces work without a talent.
 
-**Important:** because Intellect turns into attack power AND spell damage AND mana, Intellect is much more valuable for Enhancement than in Classic.
+Intellect turning into attack power AND spell power AND mana is a big reason Enhancement in Forever is different from Classic.
 
 ### Restoration (healing)
 
-- ✅ **Riptide** (31-point talent): instant heal plus a heal over 15 seconds. 6 second cooldown. Makes Chain Heal 25% stronger on that target.
-- ✅ **Water Shield** (11-point talent): 3 globes that give mana when you are hit or when your heals crit. 🟡 Each globe gives 2% of your max mana.
-- ✅ **Mana Tide Totem** moved to the 16-point talent.
-- ✅ **Mindfulness**: some mana regen keeps going while you cast. 🟡 17% per point.
-- ✅ **Healing Way**: more Healing Wave healing. 🟡 8% per point.
+- ✅ **Riptide** (31-point talent): instant heal plus a heal over 15 seconds, 6 second cooldown. Chain Heal is 25% stronger on that target.
+- ✅ **Water Shield** (11-point talent): 3 globes that give mana when you're hit or your heals crit. ☑️ Each globe gives 2% of max mana. Lasts 10 minutes.
+- ✅ **Mana Tide Totem** is now the 16-point talent.
+- ✅ **Mindfulness**: some mana regen keeps going while casting. ☑️ 17% / 33% / 50% at ranks 1 / 2 / 3.
+- ✅ **Healing Way**: more Healing Wave healing. 🟡 8% per point. 🧪
 
 ---
 
 ## 4. Weapon buffs (imbues)
 
-✅ All imbues now last **60 minutes** (was 5) and can stack with sharpening stones and wizard oils.
+✅ From Blizzard:
+- All four imbues last **60 minutes** (was 5).
+- They stack with sharpening stones, weightstones and wizard oils.
+- Windfury and Flametongue are **also party totems** now. If the buff is already on your weapon, the matching totem does nothing for you.
+- Windfury Totem and Flametongue Totem can't both be on a party. Windfury Totem also can't be up with Grace of Air.
 
-✅ **Big change:** Windfury and Flametongue are now *also* party totems. But:
-- If you have Windfury **Weapon** on, you get nothing from Windfury **Totem**. Same for Flametongue.
-- Windfury Totem and Flametongue Totem can't both be active on a party.
-- Windfury Totem can't be up with Grace of Air Totem.
+So the best setup is usually to "cross" them, for example Flametongue on your weapon and Windfury Totem for the party.
 
-So the smart setup is to "cross" them, for example Flametongue on your weapon and Windfury Totem for the party. Our weapon buff tool needs to know this rule.
+**Imbue numbers.** Only one site lists these ([ForeverChanges](https://foreverchanges.pro/class/shaman)), and it doesn't show where it got them. **Treat all as 🟡 until Angel sends the tooltips.** 🧪
 
-| Imbue | Rank 1 effect | Highest rank effect | Trust |
-|-------|---------------|---------------------|-------|
-| Rockbiter | +50 attack power | ❓ | 🟡 |
-| Flametongue | 4.71 to 18 fire damage per hit | Rank 6: 35 to 112 | 🟡 |
-| Frostbrand | 45 frost damage per hit, plus slow | Rank 5: 169 | 🟡 |
-| Windfury | 20% chance for 2 extra attacks with +104 attack power | 🟡 trainer text: +466 at top rank | 🟡 |
+| Imbue | Rank 1 | Highest rank listed |
+|-------|--------|---------------------|
+| Rockbiter | +50 attack power | ❓ |
+| Flametongue | 4.71 to 18 fire damage per hit | Rank 6: 35 to 112 |
+| Frostbrand | 45 frost damage per hit, plus slow | Rank 5: 169 |
+| Windfury | 20% chance for 2 extra attacks with +104 attack power | ❓ (a forum player quotes +466 at top rank) |
 
-🟡 Guide advice: Rockbiter for solo play (it boosts threat with the Spirit Weapons talent), Flametongue in groups.
+🟡 Guide advice (wow.gg): Rockbiter for solo, Flametongue in groups.
 
-❓ Flametongue's exact formula (how it scales with weapon speed) is not published. In Classic it scaled with weapon speed (slower weapon = bigger hits). We will measure it.
+❓ How Flametongue scales with weapon speed in Forever is unknown. We'll measure it.
 
 ---
 
 ## 5. Totems
 
-✅ Totem changes:
+✅ From Blizzard:
 - Totems use a 1.0 second global cooldown (was 1.5).
 - Buff totems last 5 minutes (was 2).
-- **Call of the Elements** (level 20) drops a saved set of 4 totems (one per element) with one 3 second cast. **Call of the Spirits** (30) and **Call of the Ancestors** (40) add more saved sets.
-- **Totemic Recall** removes your totems and refunds 25% of their mana. (Known beta bug: refund does not work yet.)
-- **Totemic Projection** (level 22) moves all totems up to 30 yards. 1 minute cooldown.
+- **Call of the Elements** (level 20) drops a saved set of 4 totems with one 3 second cast. **Call of the Spirits** (30) and **Call of the Ancestors** (40) add more sets. Cost = the 4 totems added together.
+- **Totemic Recall** (level 20) removes totems and refunds 25% of their mana. Known beta bug: the refund doesn't work yet.
+- **Totemic Projection** (level 22) moves totems up to 30 yards. 1 minute cooldown, costs 25% of base mana.
 - Resistance totems now help the whole raid group.
-- 🟡 Totems still only help your party (5 people), except resistance totems.
+- Tranquil Air Totem was removed.
 
-| Element | Totems | Unlocks at |
-|---------|--------|-----------|
-| Earth | Stoneskin, Earthbind, Stoneclaw, Strength of Earth, Tremor | Level 4 |
-| Fire | Searing, Magma, Flametongue, Frost Resistance | Level 10 |
-| Water | Healing Stream, Mana Spring, Poison Cleansing, Disease Cleansing, Fire Resistance, Mana Tide (talent) | Level 20 (quest) |
-| Air | Grounding, Windfury, Grace of Air, Nature Resistance, Windwall, Sentry | Level 30 (quest) |
+| Element | Totems | Unlocks at | Trust |
+|---------|--------|-----------|-------|
+| Earth | Stoneskin, Earthbind, Stoneclaw, Strength of Earth, Tremor | Level 4 | ☑️ |
+| Fire | Searing, Magma, Flametongue, Frost Resistance | Level 10 | ☑️ |
+| Water | Healing Stream, Mana Spring, Poison Cleansing, Disease Cleansing, Fire Resistance, Mana Tide (talent) | Level 20 (quest) | ☑️ |
+| Air | Grounding, Windfury, Grace of Air, Nature Resistance, Windwall, Sentry | Level 30 (quest) | ☑️ |
 
-🟡 Some numbers: Strength of Earth rank 5 gives 53 Strength. Windfury Totem rank 3 gives 246 attack power. Grace of Air rank 3 gives 89 Agility. Mana Tide gives 88 mana every 3 seconds.
+🟡 Totem strength numbers (Strength of Earth, Windfury Totem, Grace of Air, Mana Tide) come from one site only, so they're on the screenshot checklist instead of here.
 
 ---
 
 ## 6. Addon code: what the game lets us do
 
-This is the most important section for building the addon.
-
 ### Version number
 
-- ✅ The **interface number** is **16001**. (Classic uses 11509. Retail uses 120100.)
-- Our addon's **TOC file** must say `## Interface: 16001` or the game will mark it "out of date".
-- 🟡 Addons go in: `World of Warcraft\_classic_beta_\Interface\AddOns\` (the exact folder might change at launch).
+- ☑️ The **interface number** is **16001**. Our **TOC file** must say `## Interface: 16001`. (From [WoW Forever Guides](https://wowforeverguides.com/addons/developers) and the [forever-addon-kit](https://github.com/Thunderz96/forever-addon-kit) tester repo.) 🧪 You can confirm it in game by typing `/dump select(4, GetBuildInfo())`.
+- 🟡 Addons go in `World of Warcraft\_classic_beta_\Interface\AddOns\`. 🧪 Check where the Forever Beta folder is on your PC.
 
 ### It uses the modern (retail) addon system
 
-✅ Blizzard confirmed Forever uses "the same addon interface as retail". That means:
+- ✅ Blizzard said at its September 17 Q&A that Forever uses the same addon system as retail (reported by [PewPewShop](https://pewpewshop.pro/wow-boost/blog~wow-forever-addons-modern-client-api-built-in-damage-meter)).
+- ☑️ Old Classic functions like `GetSpellInfo`, `GetItemInfo`, `GetTalentInfo` and `UnitAura` are **gone**. We use `C_Spell`, `C_Item`, `C_UnitAuras` instead.
+- ☑️ Talents are read with `C_Traits` and `C_ClassTalents`.
 
-- Old Classic functions are **gone**: `GetSpellInfo`, `GetItemInfo`, `GetTalentInfo`, `UnitAura`. 🟡
-- We use the new versions instead: `C_Spell.GetSpellInfo`, `C_Item.GetItemInfo`, `C_UnitAuras`. 🟡
-- Talents are read with `C_Traits` and `C_ClassTalents` (the retail talent system). 🟡
+So tutorials for **Classic** addons will often be wrong. **Retail** tutorials are closer.
 
-So tutorials for **Classic** addons will often be wrong. Tutorials for **retail** addons are closer.
+### Functions that exist in the Forever beta
 
-### What we CAN read (good news for our plan)
-
-A tester captured the full list of functions in the beta client ([forever-addon-kit](https://github.com/Thunderz96/forever-addon-kit)). These exist (🟡: they exist, but we still need to test they return real numbers):
+A tester saved the full list of functions in the Forever beta ([forever-addon-kit](https://github.com/Thunderz96/forever-addon-kit), file `data/forever_api.json`). I checked our list against that file. **"Exists" doesn't mean "works"**, so the starter addon will test each one.
 
 | What we want | Function |
 |--------------|----------|
 | Strength, Agility, Stamina, Intellect, Spirit | `UnitStat("player", 1..5)` |
-| Spell damage per school | `GetSpellBonusDamage(school)` |
-| Healing power | `GetSpellBonusHealing()` |
+| Spell damage | `GetSpellBonusDamage(school)` |
+| Healing | `GetSpellBonusHealing()` |
 | Crit chance | `GetCritChance()`, `GetSpellCritChance(school)` |
 | Hit chance | `GetHitModifier()`, `GetSpellHitModifier()` |
-| Haste | `GetHaste()`, `GetMeleeHaste()` |
-| Expertise | `GetExpertise()` |
+| Dodge/parry reduction | `GetExpertise()` (❓ may not be what Forever uses) |
 | Attack power | `UnitAttackPower("player")` |
 | Weapon damage and speed | `UnitDamage("player")`, `UnitAttackSpeed("player")` |
-| Mana and max mana | `UnitPower("player", 0)`, `UnitPowerMax("player", 0)` |
+| Mana | `UnitPower("player", 0)`, `UnitPowerMax("player", 0)` |
 | Mana regen | `GetManaRegen()` |
-| Current weapon buff | `GetWeaponEnchantInfo()` |
-| Active totems | `GetTotemInfo(slot)` |
-| Equipped gear | `GetInventoryItemLink("player", slot)` |
-| Spell mana cost | `C_Spell.GetSpellPowerCost(spellID)` |
-| Talents | `C_ClassTalents.GetActiveConfigID()` + `C_Traits.GetTreeNodes(...)` / `GetNodeInfo(...)` |
-| Known spells | `IsPlayerSpell(spellID)` |
+| Weapon buff | `GetWeaponEnchantInfo()` |
+| Totems | `GetTotemInfo(slot)` |
+| Gear | `GetInventoryItemLink("player", slot)` |
+| Spell cost | `C_Spell.GetSpellPowerCost(spellID)` |
+| Talents | `C_ClassTalents.GetActiveConfigID()`, `C_Traits.GetTreeNodes(...)`, `C_Traits.GetNodeInfo(...)` |
 
-### What we CAN'T do (the restrictions)
+(`GetHaste()` also exists in the code, but haste isn't on gear, so we'll only use it to notice Berserking or Wind Blessed.)
 
-✅/🟡 Forever copies the newer retail **combat restrictions** (from the "Midnight" expansion):
+### Restrictions
 
-- **No combat log for addons.** 🟡 We can't watch every hit you do during a fight like old DPS meters did. This means our "simulated DPS" must be **calculated from your stats**, not recorded from fights.
-- **Secret values in combat.** 🟡 Some numbers (health, auras, maybe stats) become "secret" during combat. Addons can show them but not do math on them. There is even a check called `C_Secrets.ShouldUnitStatsBeSecret`. **Plan:** do all our math **out of combat**.
-- ✅ The game has its **own built-in damage meter**. 🟡 Addons may be able to read its totals through `C_DamageMeter`. That could let us compare "our predicted DPS" with "your real DPS" later.
-- 🟡 Some features are broken in beta: SavedVariables (how addons save settings) were not loading back. A tester says build 70009 fixed it, but this is unverified. `ReloadUI()` can't be called from code; type `/reload` instead.
+- ☑️ **No combat log for addons.** The addon can't record your fights, so DPS has to be **calculated from your stats**.
+- ☑️ **Secret values in combat.** Some numbers can't be used for math during combat. The function list includes `C_Secrets.ShouldUnitStatsBeSecret`. **Plan:** do all math out of combat.
+- ✅ The game has a **built-in damage meter**. ☑️ A `C_DamageMeter` namespace exists. Later we might compare our predicted DPS with your real DPS.
+- 🟡 Beta bugs from one tester: saved settings didn't load back (maybe fixed in build 70009), and `ReloadUI()` can't be called from code (type `/reload`).
 
 ---
 
 ## 7. How we will do the math (plan for Step 3)
 
-Because we can't record fights, the addon will **calculate**. Here is the simple idea, written like code you'd see in C#:
-
-### Damage of one spell
+Because the addon can't record fights, it will **calculate**. The formulas below are **🔶 Classic rules**. They are our starting guess, and the addon will test them against your real tooltips before trusting them.
 
 ```
-average hit   = (spell base damage) + (spell power × coefficient)
-coefficient   = cast time ÷ 3.5        // 🔶 Classic rule, e.g. 2.5 ÷ 3.5 = 0.714 for Lightning Bolt
-chance to land = hit chance             // 🔶 vs a boss 3 levels higher, Classic misses 17% of spells before hit gear
-crit bonus    = 50% extra damage        // 🔶 Classic spells crit for 150%; Elemental Fury adds 20% more 🟡
-expected damage = average hit × chance to land × (1 + crit chance × crit bonus)
+expected damage = (base damage + spell power × coefficient) × chance to hit × (1 + crit chance × crit bonus)
+damage per mana = expected damage ÷ mana cost
+total damage    = (max mana + mana regained) × damage per mana
+DPS             = expected damage ÷ cast time
 ```
 
-### "How much damage can I do with my mana?" (your mana pool question)
-
-```
-damage per mana  = expected damage ÷ mana cost
-total damage     = (max mana + mana regained during the fight) × damage per mana
-```
-
-The addon will do this for each spell and each rank, and tell you which spells give the most damage per mana. (In Classic, lower ranks were often more mana efficient. In Forever this may matter less, since spell power now comes from gear. 🟡)
-
-### "What is my maximum DPS?"
-
-```
-DPS = expected damage ÷ cast time (after haste)
-```
-
-For Enhancement we add melee:
-
-```
-melee DPS = (weapon damage + attack power ÷ 14 × weapon speed) ÷ weapon speed   // 🔶 Classic rule
-          + weapon buff damage + Windfury procs + Stormstrike + shocks
-```
-
-Then we combine the two and also find **when you run out of mana**: "You can do 180 DPS for 45 seconds, then 95 DPS after you run out of mana."
+How we'll check the 🔶 parts in game:
+- **Coefficient**: the tooltip for Lightning Bolt shows its damage *including* your spell power. Compare the tooltip with and without a spell power item and we can calculate the real coefficient. 🧪
+- **Chance to hit**: ❓ Forever's base miss chance isn't published. We'll show your hit % from the game instead of guessing.
+- **Crit bonus**: ❓ We'll find out from your crit numbers on target dummies.
 
 ### Stat priority from your gear
 
-The addon will pretend you have +10 of one stat, re-run the DPS math, and see how much DPS went up. Do this for each stat, sort by the gain, and you get **your** personal stat priority. (Big addons call these "stat weights".)
+The addon pretends you have +10 of one stat, re-runs the math, and sees how much DPS goes up. Sorting those gains gives **your** personal stat priority (called "stat weights").
 
 ### Where the base numbers come from
 
-- 🟡 Spell mana costs: from the game directly with `C_Spell.GetSpellPowerCost`.
-- 🟡 Spell base damage and coefficients: not readable through code. We will store them in a data table inside the addon (from the sources in this document), and update them as the beta changes.
+- Mana costs: read from the game with `C_Spell.GetSpellPowerCost`. No guessing needed.
+- Spell base damage and coefficients: not readable by code. We'll keep a data table in the addon and fill it from **your tooltip screenshots**, not from websites.
 
 ---
 
-## 8. Things we still need to find out (in game)
+## 8. Screenshot checklist for Angel
 
-Angel, these are things you could help test once the starter addon exists. The addon can print them for you.
+Angel offered to send tooltips from the beta. These are the ones that would help most, in order. Mouse over each one and send a screenshot.
 
-1. ❓ Do `UnitStat`, `GetSpellBonusDamage`, `GetCritChance` and `GetHaste` return real numbers? (Out of combat and in combat.)
-2. ❓ How much haste do you get per point?
-3. ❓ Exact spell power coefficients (we'll compare tooltip numbers with and without gear).
-4. ❓ How Flametongue Weapon scales with weapon speed.
-5. ❓ Do talent readings through `C_Traits` show the Shaman talent trees correctly?
-6. ❓ Does saving settings (SavedVariables) work in the current beta build?
+**Most important (for the Weapon Buff tool):**
+1. The tooltip for every **weapon imbue** rank you have: Rockbiter, Flametongue, Frostbrand, Windfury (from the spellbook or trainer).
+2. **Windfury Totem** and **Flametongue Totem** tooltips.
+
+**Stats:**
+3. Your **character panel**, with the tooltip open on: Intellect, Agility, Strength, Spirit, Crit Chance, Hit Chance, Spell Power, Attack Power. (This confirms the conversions in Section 2.)
+4. Any item that has a "dodge or parry" reduction effect, if you find one.
+
+**Spells:**
+5. **Lightning Bolt** (your highest rank), **Chain Lightning**, **Earth Shock**, **Flame Shock**, **Healing Wave**, **Lesser Healing Wave**, **Chain Heal**.
+6. The same Lightning Bolt tooltip again **with a spell power item taken off**. The difference lets us calculate the real coefficient.
+
+**Talents (any you can see, even if not learned):**
+7. Elemental: Elemental Fury, Convection, Elemental Focus, Lightning Overload.
+8. Enhancement: Maelstrom Weapon, Mental Dexterity, Mental Quickness, Flurry, Elemental Weapons.
+9. Restoration: Healing Way, Mindfulness, Water Shield.
+
+**Addon info:**
+10. Type `/dump select(4, GetBuildInfo())` in chat and send what it says. This is the interface number.
 
 ---
 
 ## 9. Recommended addon structure
 
-This is a proposal for Step 2. Nothing is built yet.
+A proposal for Step 2. Nothing is built yet.
 
 ```
 TheEarthenShrink/
-  TheEarthenShrink.toc     -- tells WoW about the addon (name, version 16001, file list)
+  TheEarthenShrink.toc     -- tells WoW about the addon (name, interface 16001, file list)
   Core.lua                 -- starts the addon, listens for game events
-  Data/Spells.lua          -- table of spell numbers (damage, coefficients)
+  Data/Spells.lua          -- spell numbers (filled from Angel's tooltips)
   Data/Imbues.lua          -- weapon buff numbers
   Player/Stats.lua         -- reads your stats, gear, talents
   Math/Damage.lua          -- the formulas from Section 7
@@ -290,12 +291,7 @@ TheEarthenShrink/
   UI/Tabs/*.lua            -- Overview, Weapon Buffs, Stat Priority, Mana & DPS, Tips
 ```
 
-Tabs we plan:
-1. **Overview**: your spec, talents, key stats.
-2. **Weapon Buffs**: your existing comparison, upgraded with the "crossing with totems" rule.
-3. **Stat Priority**: stat weights from your gear.
-4. **Mana & DPS**: total damage per mana pool and max DPS.
-5. **Tips**: totems, spells and rotation tips for your spec.
+The first version will also have a **"Check"** button that prints which game functions work, so we verify Section 6 in your beta client.
 
 ---
 
@@ -321,17 +317,16 @@ Tabs we plan:
 
 - **Addon**: a small program, written in Lua, that changes or adds to the WoW screen.
 - **API**: the list of functions the game gives addons to ask questions ("what is my mana?").
-- **Coefficient**: how much of your spell power gets added to a spell. 0.714 means 71.4%.
+- **Coefficient**: how much of your spell power gets added to a spell. 0.7 means 70%.
 - **Combat log**: a stream of every hit, heal and buff in a fight. Forever hides it from addons.
 - **Crit**: a critical hit, which does extra damage.
-- **Expertise**: lowers the chance the enemy dodges or parries your melee.
-- **Haste**: makes you cast and attack faster.
+- **Haste**: makes you cast or attack faster. In Forever it only comes from a few effects, not gear.
 - **Imbue**: a Shaman weapon buff (Windfury, Flametongue, Frostbrand, Rockbiter).
-- **Interface number**: the version number in the TOC file that tells WoW which game version the addon is made for.
+- **Interface number**: the version number in the TOC file that tells WoW which game version the addon is for.
 - **MP5**: mana per 5 seconds.
 - **Rank**: older spells have levels (Rank 1, Rank 2...). Higher ranks hit harder but cost more.
 - **SavedVariables**: how an addon remembers settings between game sessions.
-- **Secret value**: a number the game lets an addon *show* but not *calculate with*, during combat.
+- **Secret value**: a number the game lets an addon *show* but not *calculate with* during combat.
 - **Stat weight**: how much DPS one point of a stat is worth to *you*.
 - **TOC file**: the addon's "table of contents" file. WoW reads it first.
 - **Vanilla**: the original 2004 version of WoW.
@@ -340,14 +335,17 @@ Tabs we plan:
 
 ## Sources
 
-- Blizzard: [Forever Class Deep Dives: Mage and Shaman](https://worldofwarcraft.blizzard.com/en-us/news/24302097)
-- [Warcraft Tavern: WoW Forever Shaman Guide](https://www.warcrafttavern.com/forever/guides/shaman/)
+All of these are about WoW Forever. Blizzard sources come first.
+
+- ✅ Blizzard: [Forever Class Deep Dives: Mage and Shaman](https://worldofwarcraft.blizzard.com/en-us/news/24302097)
+- [OutputLag: BlizzCon panel on hit and crit](https://outputlag.com/news/world-of-warcraft-forever-unifies-hit-and-crit-stats-and-gives-healing-gear-bonus-damage/)
+- [PewPewShop: Forever uses the modern addon API](https://pewpewshop.pro/wow-boost/blog~wow-forever-addons-modern-client-api-built-in-damage-meter)
+- [Warcraft Tavern: Forever Stats guide](https://www.warcrafttavern.com/forever/guides/stats/) and [Shaman guide](https://www.warcrafttavern.com/forever/guides/shaman/)
+- [WoW Forever Builds: character panel and haste](https://wowforeverbuilds.com/news/wow-forevers-character-panel-now-explains-your-stats-and-missed-loot-turns-up-in)
 - [Icy Veins: Elemental](https://www.icy-veins.com/wow-forever/elemental-shaman-ranged-dps-pve-guide), [Restoration](https://www.icy-veins.com/wow-forever/restoration-shaman-healer-pve-guide)
 - [wow.gg: Enhancement (Beta)](https://wow.gg/guides/wow-forever-enhancement-shaman-beta)
-- [ForeverChanges: Shaman changes vs Classic](https://foreverchanges.pro/class/shaman) (source of most 🟡 numbers)
-- [OutputLag: Forever unifies hit and crit](https://outputlag.com/news/world-of-warcraft-forever-unifies-hit-and-crit-stats-and-gives-healing-gear-bonus-damage/)
-- [Gold Boosting: Expertise explained](https://goldboosting.com/blog/understanding-expertise-wow-forever-beginners-guide)
-- [WoW Forever Guides: Addon development, interface 16001](https://wowforeverguides.com/addons/developers)
-- [PewPewShop: Forever addons and modern API](https://pewpewshop.pro/wow-boost/blog~wow-forever-addons-modern-client-api-built-in-damage-meter)
-- [forever-addon-kit (GitHub)](https://github.com/Thunderz96/forever-addon-kit): captured list of beta API functions
-- [Blizzard forums: Flametongue vs Windfury feedback](https://us.forums.blizzard.com/en/wow/t/forever-is-forcing-enhancement-onto-flametongue-that-is-not-the-class/2375734)
+- [Mobalytics: Forever Shaman overview](https://mobalytics.gg/wow-forever/guides/shaman-class-overview) (talent rank numbers)
+- [ForeverChanges: Shaman changes](https://foreverchanges.pro/class/shaman) (imbue and spell numbers, one source only)
+- [WoW Forever Guides: addon development](https://wowforeverguides.com/addons/developers)
+- [forever-addon-kit (GitHub)](https://github.com/Thunderz96/forever-addon-kit): list of functions in the beta client
+- [Blizzard forums: Flametongue vs Windfury feedback](https://us.forums.blizzard.com/en/wow/t/forever-is-forcing-enhancement-onto-flametongue-that-is-not-the-class/2375734) (player posts)
