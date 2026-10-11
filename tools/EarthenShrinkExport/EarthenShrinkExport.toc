@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: Earthen Shrink Export
+## Notes: Saves your Shaman's spells, talents, stats, gear and tooltips to a file so The Earthen Shrink can be built from real Forever data. Type /esx.
+## Author: The Earthen Shrink
+## Version: 0.1.0
+## SavedVariables: EarthenShrinkExportDB
+
+Export.lua

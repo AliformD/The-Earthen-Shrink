@@ -251,7 +251,7 @@ The addon pretends you have +10 of one stat, re-runs the math, and sees how much
 
 ## 8. Screenshot checklist for Angel
 
-Angel offered to send tooltips from the beta. These are the ones that would help most, in order. Mouse over each one and send a screenshot.
+**Update, October 11:** screenshots are no longer needed. The helper addon in `tools/EarthenShrinkExport` saves all of these tooltips to one file. See [angel-checklist.md](angel-checklist.md). The list below is kept as a record of what we need it to capture.
 
 **Most important (for the Weapon Buff tool):**
 1. The tooltip for every **weapon imbue** rank you have: Rockbiter, Flametongue, Frostbrand, Windfury (from the spellbook or trainer).
