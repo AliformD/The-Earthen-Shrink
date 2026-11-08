@@ -3,6 +3,8 @@
 ## Notes: Shaman helper: weapon buff math, spell damage per mana, and inspect other Shamans. Type /es.
 ## Author: The Earthen Shrink
 ## Version: 0.2.0
+## Category: Combat
+## IconTexture: Interface\Icons\Spell_Nature_Lightning
 ## SavedVariables: EarthenShrinkDB
 
 Core.lua
