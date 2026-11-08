@@ -20,7 +20,9 @@ match the `## Interface:` line at the top of both .toc files (currently 16001).
 | Tab | What it shows |
 |-----|---------------|
 | **Weapon Buffs** | Rockbiter, Flametongue and Windfury at the highest rank for your level, the DPS each one adds, and the math (hover a row). "Post to chat" puts a short summary in your chat box. |
-| **Spell Efficiency** | Every damage spell and every rank: level, mana, % of your mana bar, damage, damage per mana and DPS. The best damage per mana is green. You can sort by spell or by damage per mana, and show ranks you can't learn yet. |
+| **Spell Efficiency** | Every damage spell and every rank (including Stormstrike and Lightning Shield): level, mana, % of your mana bar, damage, damage per mana and DPS. The best damage per mana is green. You can sort by spell or by damage per mana, and show ranks you can't learn yet. |
+| **Healing** | Every heal and every rank (Healing Wave, Lesser Healing Wave, Chain Heal, Riptide): mana, % of your mana, healing, healing per mana and healing per second. The most efficient useful rank gets a tick. |
+| **Totems** | Every totem at your level: cost, % of your mana, and its break-even: how many hits (Searing), enemies (Magma), or seconds (Healing Stream, Mana Spring) before it beats your best spell or heal. Also Fire Nova and Lightning Shield breakpoints, and Call of the Elements vs placing totems one by one. |
 | **Inspect** | Target another player and press **Inspect target**. It reads their gear and works out which weapon buff is best for them. "Post to chat" puts the result and the formula in your chat box. You pick the channel and press Enter. |
 
 ## Commands
@@ -29,6 +31,7 @@ match the `## Interface:` line at the top of both .toc files (currently 16001).
 |------|--------------|
 | `/es` | Open or close the window |
 | `/es spells` | Open the Spell Efficiency tab |
+| `/es healing` / `/es totems` | Open the Healing or Totems tab |
 | `/es inspect` | Inspect your target and open the Inspect tab |
 | `/es check` | Print what the addon could read from the game (helps find problems) |
 | `/es sptooltip on` / `off` | Tell the addon whether your spell tooltips already include spell power |

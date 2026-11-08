@@ -88,6 +88,66 @@ function SD.ParseImbue(key, text)
     return out
 end
 
+-- "Heals a friendly target for 34 to 44." -> { min = 34, max = 44 }
+function SD.ParseHeal(text)
+    text = stripCodes(text)
+    if not text then return nil end
+    local lower = text:lower()
+    local a, b = lower:match("for " .. NUM .. " to " .. NUM)
+    if not a then a, b = lower:match(NUM .. " to " .. NUM) end
+    if not a then a = lower:match("for " .. NUM); b = a end
+    if not a then return nil end
+    local out = { min = tonumber(a), max = tonumber(b) }
+    local hot, sec = lower:match(NUM .. " over " .. NUM .. " sec")
+    if hot then out.hot, out.hotSec = tonumber(hot), tonumber(sec) end
+    return out
+end
+
+-- Reads the time in seconds from "lasts 2 min" or "lasts 30 sec".
+local function lasts(lower)
+    local m = lower:match("lasts " .. NUM .. " min")
+    if m then return tonumber(m) * 60 end
+    local s = lower:match("lasts " .. NUM .. " sec")
+    if s then return tonumber(s) end
+    return nil
+end
+
+-- Totems: amount per pulse, how often it pulses, how long it lasts.
+function SD.ParseTotem(kind, text)
+    text = stripCodes(text)
+    if not text then return nil end
+    local lower = text:lower()
+    local out = { duration = lasts(lower) }
+    out.interval = tonumber(lower:match("every " .. NUM .. " sec")) or (lower:match("every second") and 1) or nil
+    if kind == "dmg" or kind == "aoe" then
+        local a, b = lower:match(NUM .. " to " .. NUM .. " %a+ damage")
+        if not a then a = lower:match(NUM .. " %a+ damage"); b = a end
+        if not a then return nil end
+        out.min, out.max = tonumber(a), tonumber(b)
+    elseif kind == "heal" then
+        local h = lower:match("for " .. NUM) or lower:match(NUM .. " health")
+        if not h then return nil end
+        out.min, out.max = tonumber(h), tonumber(h)
+    elseif kind == "mana" then
+        local m = lower:match(NUM .. " mana") or lower:match(NUM .. "%% of")
+        if not m then return nil end
+        out.mana = tonumber(m)
+        out.manaIsPercent = lower:match(NUM .. "%% of") ~= nil and not lower:match(NUM .. " mana")
+    end
+    return out
+end
+
+-- Lightning Shield: "...causing 13 Nature damage. 3 charges."
+function SD.ParseShield(text)
+    text = stripCodes(text)
+    if not text then return nil end
+    local lower = text:lower()
+    local d = lower:match(NUM .. " %a+ damage")
+    if not d then return nil end
+    local charges = tonumber(lower:match(NUM .. " charges"))
+    return { dmg = tonumber(d), charges = charges or 3, chargesGuessed = charges == nil, duration = lasts(lower) }
+end
+
 ---------------------------------------------------------------------------
 -- Asking the game about one spell ID
 ---------------------------------------------------------------------------
@@ -187,12 +247,24 @@ local function readRank(spell, id, rank, guessLevel)
         end
     end
     rec.desc = stripCodes(desc)
-    if spell.kind == "imbue" then
+    local k = spell.kind
+    if k == "imbue" then
         rec.imbue = SD.ParseImbue(spell.key, rec.desc)
         rec.parsed = rec.imbue ~= nil
-    else
+    elseif k == "spell" then
         rec.dmg = SD.ParseDamage(rec.desc)
         rec.parsed = rec.dmg ~= nil
+    elseif k == "heal" then
+        rec.heal = SD.ParseHeal(rec.desc)
+        rec.parsed = rec.heal ~= nil
+    elseif k == "totem" then
+        rec.totem = SD.ParseTotem(spell.totem, rec.desc)
+        rec.parsed = rec.totem ~= nil
+    elseif k == "shield" then
+        rec.shield = SD.ParseShield(rec.desc)
+        rec.parsed = rec.shield ~= nil
+    else
+        rec.parsed = rec.desc ~= nil
     end
 
     if not rec.desc or rec.desc == "" then

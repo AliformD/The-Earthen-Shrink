@@ -2,7 +2,7 @@
 ## Title: The Earthen Shrink
 ## Notes: Shaman helper: weapon buff math, spell damage per mana, and inspect other Shamans. Type /es.
 ## Author: The Earthen Shrink
-## Version: 0.2.0
+## Version: 0.3.0
 ## Category: Combat
 ## IconTexture: Interface\Icons\Spell_Nature_Lightning
 ## SavedVariables: EarthenShrinkDB
@@ -13,9 +13,12 @@ Data/SpellData.lua
 Profile.lua
 Math/Spells.lua
 Math/Imbues.lua
+Math/Totems.lua
 Chat.lua
 UI/Widgets.lua
 UI/Window.lua
 UI/WeaponTab.lua
 UI/SpellsTab.lua
+UI/HealingTab.lua
+UI/TotemsTab.lua
 UI/InspectTab.lua

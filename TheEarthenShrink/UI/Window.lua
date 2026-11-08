@@ -15,6 +15,8 @@ UI.CONTENT_W = UI.WIDTH - 28
 local TAB_ORDER = {
     { id = "weapon",  title = "Weapon Buffs" },
     { id = "spells",  title = "Spell Efficiency" },
+    { id = "healing", title = "Healing" },
+    { id = "totems",  title = "Totems" },
     { id = "inspect", title = "Inspect" },
 }
 

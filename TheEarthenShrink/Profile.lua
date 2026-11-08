@@ -93,6 +93,7 @@ function P.Player()
     for school, i in pairs(SCHOOL_INDEX) do
         p.sp[school] = ns.clean(ns.try(GetSpellBonusDamage, i)) or 0
     end
+    p.healing = ns.clean(ns.try(GetSpellBonusHealing)) or 0
     -- Forever uses one crit chance and one hit chance for everything.
     p.spellCrit = ns.clean(ns.try(GetSpellCritChance, SCHOOL_INDEX.Nature)) or 0
     p.meleeCrit = ns.clean(ns.try(GetCritChance)) or p.spellCrit
@@ -153,6 +154,7 @@ function P.FromGear(unit, info)
     p.hit, p.spellHit = g.hit or 0, g.hit or 0
     p.sp = {}
     for school in pairs(SCHOOL_INDEX) do p.sp[school] = g.sp or 0 end
+    p.healing = g.sp or 0
     if not p.mana then p.mana = math.floor(55 + 18.5 * L + 15 * math.max(0, int - 20)) end
     p.estimated.ap, p.estimated.meleeCrit, p.estimated.spellCrit = true, true, true
 

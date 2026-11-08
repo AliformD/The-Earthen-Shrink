@@ -22,6 +22,7 @@ local function newObj(kind)
       StartMoving = function() end, StopMovingOrSizing = function() end,
     }
     if special[k] then return special[k] end
+    if type(k) == "string" and k:match("^[a-z_]") then return nil end  -- fields we never set are nil, like in the game
     return function() end
   end })
 end
@@ -48,6 +49,8 @@ function NotifyInspect(u) INSPECTED = u end
 function UnitPowerMax(u) return u == "player" and 1450 or 1200 end
 function UnitPower() return 1300 end
 function GetSpellBonusDamage(i) return 64 end
+function GetSpellBonusHealing() return 90 end
+function GetInventoryItemTexture() return 135000 end
 function GetSpellCritChance() return 4.5 end
 function GetCritChance() return 6.2 end
 function GetHitModifier() return 1 end
@@ -74,11 +77,31 @@ SPELLS = {
   [6041]= { name="Lightning Bolt", rank=6, mana=135, cast=2500, desc="Casts a bolt of lightning at the target for 178 to 202 Nature damage.", lvl=32 },
   [8050]= { name="Flame Shock", rank=1, mana=55, cast=0, desc="Instantly sears the target with fire, causing 25 Fire damage immediately and 28 Fire damage over 12 sec.", lvl=10 },
   [8042]= { name="Earth Shock", rank=1, mana=30, cast=0, desc="Instantly shocks the target with concussive force, causing 19 to 22 Nature damage.", lvl=4 },
-  [1535]= { name="Fire Nova Totem", rank=1, mana=95, cast=0, desc="x", lvl=12 },
   [8017]= { name="Rockbiter Weapon", rank=1, mana=20, cast=0, desc="Imbue the Shaman's weapon, increasing attack power by 50 for 60 min.", lvl=1 },
   [10399]={ name="Rockbiter Weapon", rank=4, mana=60, cast=0, desc="Imbue the Shaman's weapon, increasing attack power by 150 for 60 min.", lvl=24 },
   [8030]= { name="Flametongue Weapon", rank=3, mana=60, cast=0, desc="Imbue the Shaman's weapon with fire. Each hit causes 4.71 to 18 additional Fire damage, based on the speed of the weapon.", lvl=26 },
   [8232]= { name="Windfury Weapon", rank=1, mana=95, cast=0, desc="Imbue the Shaman's weapon with wind. Each hit has a 20% chance of dealing additional damage equal to two extra attacks with 104 extra attack power.", lvl=30 },
+  [324] = { name="Lightning Shield", rank=1, mana=45, cast=0, desc="Surrounds the caster with balls of lightning that deal 13 Nature damage to attackers. 3 charges. Lasts 10 min.", lvl=8 },
+  [905] = { name="Lightning Shield", rank=3, mana=100, cast=0, desc="Surrounds the caster with balls of lightning that deal 50 Nature damage to attackers. 3 charges. Lasts 10 min.", lvl=24 },
+  [3599]= { name="Searing Totem", rank=1, mana=25, cast=0, desc="Summons a Searing Totem that attacks one enemy within 20 yards for 9 to 11 Fire damage. Lasts 30 sec.", lvl=10 },
+  [6363]= { name="Searing Totem", rank=2, mana=45, cast=0, desc="Summons a Searing Totem that attacks one enemy within 20 yards for 13 to 17 Fire damage. Lasts 35 sec.", lvl=20 },
+  [8190]= { name="Magma Totem", rank=1, mana=230, cast=0, desc="Summons a Magma Totem that causes 22 Fire damage to all enemies within 8 yards every 2 sec. Lasts 20 sec.", lvl=26 },
+  [5394]= { name="Healing Stream Totem", rank=1, mana=40, cast=0, desc="Summons a Healing Stream Totem that heals group members within 20 yards for 6 every 2 sec. Lasts 5 min.", lvl=20 },
+  [5675]= { name="Mana Spring Totem", rank=1, mana=40, cast=0, desc="Summons a Mana Spring Totem that restores 4 mana to group members within 20 yards every 2 sec. Lasts 5 min.", lvl=26 },
+  [8071]= { name="Stoneskin Totem", rank=1, mana=30, cast=0, desc="Party members take 4 less damage from melee attacks. Lasts 5 min.", lvl=4 },
+  [331] = { name="Healing Wave", rank=1, mana=25, cast=1500, desc="Heals a friendly target for 34 to 44.", lvl=1 },
+  [547] = { name="Healing Wave", rank=3, mana=80, cast=2500, desc="Heals a friendly target for 136 to 163.", lvl=12 },
+  [939] = { name="Healing Wave", rank=5, mana=200, cast=3000, desc="Heals a friendly target for 389 to 454.", lvl=24 },
+  [8004]= { name="Lesser Healing Wave", rank=1, mana=105, cast=1500, desc="Heals a friendly target for 162 to 186.", lvl=20 },
+  [77001]={ name="Stormstrike", rank=1, mana=40, cast=0, desc="Instantly strike an enemy with both weapons. Your next Lightning Bolt, Chain Lightning or Earth Shock deals 20% more damage.", lvl=20 },
+  [77002]={ name="Call of the Elements", rank=1, mana=0, cast=3000, desc="Calls the 4 totems you have saved.", lvl=20 },
+  [1535] = { name="Fire Nova", rank=1, mana=95, cast=0, desc="Your Fire totem explodes, causing 53 to 62 Fire damage to all enemies within 10 yards.", lvl=12 },
+}
+local BOOK = { 77001, 77002 }
+C_SpellBook = {
+  GetNumSpellBookSkillLines = function() return 1 end,
+  GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = #BOOK, name = "Shaman" } end,
+  GetSpellBookItemInfo = function(i) local id = BOOK[i]; return { spellID = id, name = SPELLS[id].name, subName = "" } end,
 }
 C_Spell = {
   GetSpellInfo = function(id) local s = SPELLS[id]; if s then return { name = s.name, castTime = s.cast, iconID = 136048 } end end,
@@ -128,6 +151,13 @@ runTimers()
 ns.UI.Update()
 dump("inspect")
 ns.Chat.OpenInChatBox(TheEarthenShrinkFrame.pages.inspect.message)
+SlashCmdList.THEEARTHENSHRINK("totems")
+dump("totems")
+SlashCmdList.THEEARTHENSHRINK("spells")
+TheEarthenShrinkFrame.pages.spells.sort._scripts.OnClick()
+dump("spells")
+SlashCmdList.THEEARTHENSHRINK("healing")
+dump("healing")
 -- trainer test: Forever has a new Chain Lightning ID 99001 at level 28
 SPELLS[99001] = { name="Chain Lightning", rank=1, mana=120, cast=2000, desc="Hurls a lightning bolt at the enemy, dealing 200 to 227 Nature damage and then jumping to additional nearby enemies.", lvl=0 }
 function GetNumTrainerServices() return 2 end

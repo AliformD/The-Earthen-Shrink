@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.2.0"
+ns.VERSION = "0.3.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -129,7 +129,7 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "" then
         ns.UI.Toggle()
-    elseif msg == "spells" or msg == "weapon" or msg == "inspect" then
+    elseif msg == "spells" or msg == "weapon" or msg == "inspect" or msg == "totems" or msg == "healing" then
         ns.UI.Show(msg)
         if msg == "inspect" then ns.Inspect.Start("target") end
     elseif msg:match("^sptooltip") then
@@ -143,6 +143,6 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es inspect, /es check, /es sptooltip on|off")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es inspect, /es check, /es sptooltip on|off")
     end
 end

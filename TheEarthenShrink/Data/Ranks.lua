@@ -55,6 +55,95 @@ ns.RANKS = {
     -- so it only shows up if it's in your spellbook.
     { key = "LvB", name = "Lava Burst", school = "Fire", kind = "spell", ranks = {} },
 
+    -- Stormstrike (Enhancement talent): a weapon strike. Its mana cost is read
+    -- from the game, so a cost that is a % of your base mana works too.
+    -- No ID known for Forever yet, so it only shows if it's in your spellbook.
+    { key = "SS", name = "Stormstrike", kind = "strike", ranks = {} },
+    -- Lightning Shield: hits back when you're hit, a few charges, then recast.
+    { key = "LS", name = "Lightning Shield", school = "Nature", kind = "shield", ranks = {
+        { id = 324,   rank = 1, level = 8 },  { id = 325,   rank = 2, level = 16 },
+        { id = 905,   rank = 3, level = 24 }, { id = 945,   rank = 4, level = 32 },
+        { id = 8134,  rank = 5, level = 40 }, { id = 10431, rank = 6, level = 48 },
+        { id = 10432, rank = 7, level = 56 },
+    } },
+
+    -- Healing spells (used to judge healing totems) -------------------------
+    { key = "HW", name = "Healing Wave", school = "Nature", kind = "heal", ranks = {
+        { id = 331,   rank = 1,  level = 1 },  { id = 332,   rank = 2,  level = 6 },
+        { id = 547,   rank = 3,  level = 12 }, { id = 913,   rank = 4,  level = 18 },
+        { id = 939,   rank = 5,  level = 24 }, { id = 959,   rank = 6,  level = 32 },
+        { id = 8005,  rank = 7,  level = 40 }, { id = 10395, rank = 8,  level = 48 },
+        { id = 10396, rank = 9,  level = 56 }, { id = 25357, rank = 10, level = 60 },
+    } },
+    { key = "LHW", name = "Lesser Healing Wave", school = "Nature", kind = "heal", ranks = {
+        { id = 8004,  rank = 1, level = 20 }, { id = 8008,  rank = 2, level = 28 },
+        { id = 8010,  rank = 3, level = 36 }, { id = 10466, rank = 4, level = 44 },
+        { id = 10467, rank = 5, level = 52 }, { id = 10468, rank = 6, level = 60 },
+    } },
+    { key = "CH", name = "Chain Heal", school = "Nature", kind = "heal", ranks = {
+        { id = 1064,  rank = 1, level = 40 }, { id = 10622, rank = 2, level = 46 },
+        { id = 10623, rank = 3, level = 54 },
+    } },
+    { key = "RT", name = "Riptide", school = "Nature", kind = "heal", ranks = {} },
+
+    -- Totems -------------------------------------------------------------
+    -- totem = what kind of value it gives: "dmg" (one target), "aoe" (all
+    -- nearby enemies), "heal", "mana", or "buff" (no mana value to compare).
+    { key = "ST", name = "Searing Totem", element = "Fire", school = "Fire", kind = "totem", totem = "dmg", ranks = {
+        { id = 3599,  rank = 1, level = 10 }, { id = 6363,  rank = 2, level = 20 },
+        { id = 6364,  rank = 3, level = 30 }, { id = 6365,  rank = 4, level = 40 },
+        { id = 10437, rank = 5, level = 50 }, { id = 10438, rank = 6, level = 60 },
+    } },
+    { key = "MT", name = "Magma Totem", element = "Fire", school = "Fire", kind = "totem", totem = "aoe", ranks = {
+        { id = 8190,  rank = 1, level = 26 }, { id = 10585, rank = 2, level = 36 },
+        { id = 10586, rank = 3, level = 46 }, { id = 10587, rank = 4, level = 56 },
+    } },
+    { key = "FTT", name = "Flametongue Totem", element = "Fire", kind = "totem", totem = "buff", ranks = {
+        { id = 8227,  rank = 1, level = 28 }, { id = 8249,  rank = 2, level = 38 },
+        { id = 10526, rank = 3, level = 48 }, { id = 16387, rank = 4, level = 58 },
+    } },
+    { key = "HST", name = "Healing Stream Totem", element = "Water", kind = "totem", totem = "heal", ranks = {
+        { id = 5394,  rank = 1, level = 20 }, { id = 6375,  rank = 2, level = 30 },
+        { id = 6377,  rank = 3, level = 40 }, { id = 10462, rank = 4, level = 50 },
+        { id = 10463, rank = 5, level = 60 },
+    } },
+    { key = "MST", name = "Mana Spring Totem", element = "Water", kind = "totem", totem = "mana", ranks = {
+        { id = 5675,  rank = 1, level = 26 }, { id = 10495, rank = 2, level = 36 },
+        { id = 10496, rank = 3, level = 46 }, { id = 10497, rank = 4, level = 56 },
+    } },
+    { key = "MTT", name = "Mana Tide Totem", element = "Water", kind = "totem", totem = "mana", ranks = {} },
+    { key = "SKT", name = "Stoneskin Totem", element = "Earth", kind = "totem", totem = "buff", ranks = {
+        { id = 8071,  rank = 1, level = 4 },  { id = 8154,  rank = 2, level = 14 },
+        { id = 8155,  rank = 3, level = 24 }, { id = 10406, rank = 4, level = 34 },
+        { id = 10407, rank = 5, level = 44 }, { id = 10408, rank = 6, level = 54 },
+    } },
+    { key = "SOE", name = "Strength of Earth Totem", element = "Earth", kind = "totem", totem = "buff", ranks = {
+        { id = 8075,  rank = 1, level = 10 }, { id = 8160,  rank = 2, level = 24 },
+        { id = 8161,  rank = 3, level = 38 }, { id = 10442, rank = 4, level = 52 },
+        { id = 25361, rank = 5, level = 60 },
+    } },
+    { key = "EBT", name = "Earthbind Totem", element = "Earth", kind = "totem", totem = "buff", ranks = {
+        { id = 2484, rank = 1, level = 6 },
+    } },
+    { key = "TT", name = "Tremor Totem", element = "Earth", kind = "totem", totem = "buff", ranks = {
+        { id = 8143, rank = 1, level = 18 },
+    } },
+    { key = "WFT", name = "Windfury Totem", element = "Air", kind = "totem", totem = "buff", ranks = {
+        { id = 8512,  rank = 1, level = 32 }, { id = 10613, rank = 2, level = 42 },
+        { id = 10614, rank = 3, level = 52 },
+    } },
+    { key = "GOA", name = "Grace of Air Totem", element = "Air", kind = "totem", totem = "buff", ranks = {
+        { id = 8835,  rank = 1, level = 42 }, { id = 10627, rank = 2, level = 56 },
+        { id = 25359, rank = 3, level = 60 },
+    } },
+    { key = "GT", name = "Grounding Totem", element = "Air", kind = "totem", totem = "buff", ranks = {
+        { id = 8177, rank = 1, level = 30 },
+    } },
+
+    -- Totem tools (new in Forever; only found through your spellbook) ------
+    { key = "COE", name = "Call of the Elements", kind = "utility", ranks = {} },
+    { key = "TR", name = "Totemic Recall", kind = "utility", ranks = {} },
+
     -- Weapon imbues ------------------------------------------------------
     { key = "RB", name = "Rockbiter Weapon", kind = "imbue", ranks = {
         { id = 8017,  rank = 1, level = 1 },  { id = 8018,  rank = 2, level = 8 },

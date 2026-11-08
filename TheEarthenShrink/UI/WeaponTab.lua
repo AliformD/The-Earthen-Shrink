@@ -53,21 +53,46 @@ function ns.ImbueRows(p, list)
 end
 
 -- Rows showing the numbers the math used, so you can check them.
+-- Each one has its own icon, says whether it's exact or an estimate, and
+-- explains in the tooltip which weapon buff it matters for.
+local STAT_INFO = {
+    weapon = { icon = "Interface\\Icons\\INV_Axe_04", tip = "Your main-hand weapon. Its speed matters most: slow weapons get more from Windfury and Flametongue per hit." },
+    ap     = { icon = "Interface\\Icons\\Ability_Warrior_BattleShout", tip = "Attack power. Every 14 adds 1 DPS. Windfury's extra attacks use it, so more AP makes Windfury better." },
+    mcrit  = { icon = "Interface\\Icons\\Ability_CriticalStrike", tip = "Melee crit chance. Makes Rockbiter and Windfury hits crit more often." },
+    scrit  = { icon = "Interface\\Icons\\Spell_Nature_StormReach", tip = "Spell crit chance. Flametongue's fire damage uses this one." },
+    hit    = { icon = "Interface\\Icons\\Ability_Marksmanship", tip = "Hit from gear lowers your miss chance. Every buff here only works on hits that land." },
+    sp     = { icon = "Interface\\Icons\\Spell_Nature_Lightning", tip = "Nature spell power. Used by Lightning Bolt, Earth Shock and Lightning Shield, not by weapon buffs." },
+    mana   = { icon = "Interface\\Icons\\INV_Potion_76", tip = "Your mana pool. The Spell Efficiency tab uses it for '% of mana' and 'casts per mana bar'." },
+}
+
 function ns.ProfileRows(p)
-    local est = function(k) return p.estimated and p.estimated[k] and " (estimate)" or "" end
     local w = p.weapon or {}
     local rows = { { header = "Numbers used" } }
-    local function add(name, value, sub)
-        rows[#rows + 1] = { icon = 136243, name = name, sub = sub or "", cols = { "", value } }
+    local function add(key, name, value, estKey)
+        local info = STAT_INFO[key]
+        local est = estKey and p.estimated and p.estimated[estKey]
+        local icon = info.icon
+        if key == "weapon" and p.unit then
+            icon = ns.try(GetInventoryItemTexture, p.unit, 16) or icon
+        end
+        rows[#rows + 1] = {
+            icon = icon, name = name,
+            sub = est and "|cffff8000estimate|r · from gear and level" or "|cff1eff00exact|r · read from the game",
+            cols = { "", value },
+            tooltip = function(tt)
+                tt:AddDoubleLine(name, value, 1, 1, 1, 1, 1, 1)
+                tt:AddLine(info.tip, 1, 0.82, 0, true)
+                if est then W.AddNote(tt, "We can't read another player's stats, so this is worked out from their gear and level with old Classic rules.") end
+            end,
+        }
     end
-    add("Weapon", w.min and (f(w.min) .. " - " .. f(w.max) .. " @ " .. f(w.speed or 0, 2)) or "none",
-        w.name or "Main hand")
-    add("Attack power", f(p.ap or 0) .. est("ap"))
-    add("Melee crit", f(p.meleeCrit or 0, 2) .. "%" .. est("meleeCrit"))
-    add("Spell crit", f(p.spellCrit or 0, 2) .. "%" .. est("spellCrit"))
-    add("Hit from gear", f(p.hit or 0) .. "%")
-    add("Spell power (Nature)", f(p.sp and p.sp.Nature or 0))
-    add("Max mana", f(p.mana or 0) .. est("mana"))
+    add("weapon", w.name or "Main hand", w.min and (f(w.min) .. " - " .. f(w.max) .. " @ " .. f(w.speed or 0, 2)) or "none")
+    add("ap", "Attack power", f(p.ap or 0), "ap")
+    add("mcrit", "Melee crit", f(p.meleeCrit or 0, 2) .. "%", "meleeCrit")
+    add("scrit", "Spell crit", f(p.spellCrit or 0, 2) .. "%", "spellCrit")
+    add("hit", "Hit from gear", f(p.hit or 0) .. "%")
+    add("sp", "Spell power (Nature)", f(p.sp and p.sp.Nature or 0))
+    add("mana", "Max mana", f(p.mana or 0), "mana")
     return rows
 end
 

@@ -141,7 +141,10 @@ function W.List(parent, width, height, columns, meterAfter)
         local line = r:CreateTexture(nil, "BACKGROUND")
         line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1)
         line:SetColorTexture(1, 1, 1, 0.05)
-        r.bg = r:CreateTexture(nil, "BACKGROUND")
+        r.stripe = r:CreateTexture(nil, "BACKGROUND")
+        r.stripe:SetAllPoints()
+        r.stripe:SetColorTexture(1, 1, 1, 0.025)
+        r.bg = r:CreateTexture(nil, "BACKGROUND", nil, 1)
         r.bg:SetAllPoints()
         r.bg:SetColorTexture(0.2, 0.46, 0.8, 0.35)
         r.bg:Hide()
@@ -153,6 +156,12 @@ function W.List(parent, width, height, columns, meterAfter)
         r.icon:SetSize(26, 26)
         r.icon:SetPoint("LEFT", 8, 0)
         r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        -- small green tick on the icon for the "best" row
+        r.badge = r:CreateTexture(nil, "OVERLAY")
+        r.badge:SetSize(14, 14)
+        r.badge:SetPoint("BOTTOMRIGHT", r.icon, "BOTTOMRIGHT", 4, -3)
+        r.badge:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+        r.badge:Hide()
 
         r.name = W.Text(r, "GameFontNormal", nil, "LEFT")
         r.name:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 8, 1)
@@ -186,6 +195,10 @@ function W.List(parent, width, height, columns, meterAfter)
         end
 
         -- Section header look (used when a row is a title, not data)
+        r.sectionIcon = r:CreateTexture(nil, "ARTWORK")
+        r.sectionIcon:SetSize(14, 14)
+        r.sectionIcon:SetPoint("LEFT", 8, 0)
+        r.sectionIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.section = W.Text(r, "GameFontNormalSmall", nil, "LEFT")
         r.section:SetPoint("LEFT", 8, 0)
         r.section:SetTextColor(0.6, 0.6, 0.6)
@@ -218,6 +231,12 @@ function W.List(parent, width, height, columns, meterAfter)
             y = y + h
             local isHeader = data.header ~= nil
             r.section:SetText(isHeader and data.header:upper() or "")
+            r.section:ClearAllPoints()
+            r.section:SetPoint("LEFT", (isHeader and data.headerIcon) and 28 or 8, 0)
+            r.sectionIcon:SetShown(isHeader and data.headerIcon ~= nil)
+            if isHeader and data.headerIcon then r.sectionIcon:SetTexture(data.headerIcon) end
+            r.badge:SetShown(not isHeader and data.badge and true or false)
+            r.stripe:SetShown(not isHeader and i % 2 == 0)
             r.icon:SetShown(not isHeader)
             r.name:SetShown(not isHeader)
             r.sub:SetShown(not isHeader)
@@ -229,7 +248,13 @@ function W.List(parent, width, height, columns, meterAfter)
                 local nc = data.nameColor or W.GOLD
                 r.name:SetTextColor(nc[1], nc[2], nc[3])
                 r.sub:SetText(data.sub or "")
-                if r.meter and data.meter then r.meter:SetValue(math.max(0, math.min(1, data.meter))) end
+                if r.meter and data.meter then
+                    r.meter:SetValue(math.max(0, math.min(1, data.meter)))
+                    local mc = data.meterColor or { 0.95, 0.75, 0.15 }
+                    r.meter:SetStatusBarColor(mc[1], mc[2], mc[3])
+                end
+                r.icon:SetDesaturated(data.dim and true or false)
+                r.icon:SetAlpha(data.dim and 0.6 or 1)
             end
             for c, t in ipairs(r.cols) do
                 t:SetText(not isHeader and data.cols and data.cols[c] or "")
@@ -253,7 +278,9 @@ end
 -- yellow; { left, right } pairs are shown as two columns.
 function W.AddMath(tt, lines)
     for _, l in ipairs(lines or {}) do
-        if type(l) == "table" then
+        if l == "" then
+            -- skip empty lines
+        elseif type(l) == "table" then
             tt:AddDoubleLine(l[1], l[2], 1, 0.82, 0, 1, 1, 1)
         else
             tt:AddLine(l, 0.91, 0.89, 0.78, true)

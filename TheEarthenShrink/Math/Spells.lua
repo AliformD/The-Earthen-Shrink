@@ -95,3 +95,125 @@ function M.Explain(spell, rank, c)
     if spell.aoe then lines[#lines + 1] = "Per enemy hit. 3 enemies = 3× the damage." end
     return lines
 end
+
+---------------------------------------------------------------------------
+-- "Useful" ranks
+---------------------------------------------------------------------------
+-- A low rank can have great damage per mana but tiny DPS (nobody really casts
+-- Lightning Bolt Rank 1). A rank only counts for "best per mana" when its
+-- output per second is at least this share of the spell's best rank you have.
+M.RULES.usefulShare = 0.5
+
+-- Marks c.useful on every calc in a list of { spell, rank, c, locked }.
+function M.MarkUseful(entries, field)
+    field = field or "dps"
+    local top = {}
+    for _, e in ipairs(entries) do
+        if e.c and not e.locked then
+            local k = e.spell.key
+            top[k] = math.max(top[k] or 0, e.c[field] or 0)
+        end
+    end
+    for _, e in ipairs(entries) do
+        if e.c then
+            e.c.useful = not e.locked and (e.c[field] or 0) >= (top[e.spell.key] or 0) * M.RULES.usefulShare
+        end
+    end
+end
+
+---------------------------------------------------------------------------
+-- Healing spells
+---------------------------------------------------------------------------
+M.RULES.healCritBonus = 0.5   -- 🔶 a heal crit heals +50%
+
+function M.CalcHeal(spell, rank, p)
+    if not rank or not rank.heal or not rank.mana or rank.mana <= 0 then return nil end
+    local R, h = M.RULES, rank.heal
+    local cast = math.max(rank.cast or 0, R.gcd)
+    local coef = cast / R.directBase
+    if rank.level and rank.level < R.lowLevelPenaltyStart then
+        coef = coef * (1 - (R.lowLevelPenaltyStart - rank.level) * R.lowLevelPenaltyPerLevel)
+    end
+    local bonus = ns.db().tooltipIncludesSpellPower and 0 or (p.healing or 0)
+    local c = { coef = coef, bonus = bonus, time = cast, mana = rank.mana }
+    c.avgBase = (h.min + h.max) / 2
+    c.expected = (c.avgBase + bonus * coef) * (1 + (p.spellCrit or 0) / 100 * R.healCritBonus) + (h.hot or 0)
+    c.hpm = c.expected / rank.mana
+    c.hps = c.expected / cast
+    c.manaPct = p.mana and p.mana > 0 and rank.mana / p.mana * 100 or nil
+    return c
+end
+
+---------------------------------------------------------------------------
+-- Lightning Shield and Stormstrike
+---------------------------------------------------------------------------
+M.RULES.shieldCoef = 0.33     -- 🔶 share of spell power per Lightning Shield charge
+
+function M.CalcShield(spell, rank, p)
+    if not rank or not rank.shield or not rank.mana or rank.mana <= 0 then return nil end
+    local R, sh = M.RULES, rank.shield
+    local sp = ns.db().tooltipIncludesSpellPower and 0 or ((p.sp and p.sp.Nature) or 0)
+    local c = { mana = rank.mana, charges = sh.charges }
+    c.perCharge = (sh.dmg + sp * R.shieldCoef) * (1 + (p.spellCrit or 0) / 100 * R.spellCritBonus)
+    c.expected = c.perCharge * sh.charges        -- all charges used before it ends
+    c.dpm = c.expected / rank.mana
+    c.time = R.gcd
+    c.dps = c.expected / R.gcd                   -- damage per second of YOUR time spent casting it
+    c.manaPct = p.mana and p.mana > 0 and rank.mana / p.mana * 100 or nil
+    return c
+end
+
+-- Stormstrike: one weapon hit. (Its +20% on your next shock or bolt is not added here.)
+function M.CalcStrike(spell, rank, p)
+    if not rank or not rank.mana or rank.mana <= 0 then return nil end
+    local w = p.weapon
+    if not (w and w.min and w.speed) then return nil end
+    local IR = ns.ImbueMath.RULES
+    local hit = (w.min + w.max) / 2 + (p.ap or 0) / IR.apPerDps * w.speed
+    local c = { mana = rank.mana, time = M.RULES.gcd }
+    c.expected = hit * (1 + (p.meleeCrit or 0) / 100 * IR.meleeCritBonus)
+    c.dpm = c.expected / rank.mana
+    c.dps = c.expected / c.time
+    c.manaPct = p.mana and p.mana > 0 and rank.mana / p.mana * 100 or nil
+    return c
+end
+
+---------------------------------------------------------------------------
+-- Reference numbers: "the best you'd get from a normal spell"
+---------------------------------------------------------------------------
+
+-- Best damage per mana from a useful single-target damage rank you have.
+function M.BestDamageRef(p)
+    local entries = {}
+    for _, key in ipairs({ "LB", "CL", "ES", "FlS", "FrS", "LvB" }) do
+        local spell = ns.RANKS_BY_KEY[key]
+        for _, rank in ipairs(ns.SpellData.Ranks(key)) do
+            local locked = rank.level and rank.level > p.level
+            entries[#entries + 1] = { spell = spell, rank = rank, c = M.Calc(spell, rank, p), locked = locked }
+        end
+    end
+    M.MarkUseful(entries, "dps")
+    local best
+    for _, e in ipairs(entries) do
+        if e.c and e.c.useful and (not best or e.c.dpm > best.c.dpm) then best = e end
+    end
+    return best
+end
+
+-- Best healing per mana from a useful heal rank you have.
+function M.BestHealRef(p)
+    local entries = {}
+    for _, key in ipairs({ "HW", "LHW", "CH", "RT" }) do
+        local spell = ns.RANKS_BY_KEY[key]
+        for _, rank in ipairs(ns.SpellData.Ranks(key)) do
+            local locked = rank.level and rank.level > p.level
+            entries[#entries + 1] = { spell = spell, rank = rank, c = M.CalcHeal(spell, rank, p), locked = locked }
+        end
+    end
+    M.MarkUseful(entries, "hps")
+    local best
+    for _, e in ipairs(entries) do
+        if e.c and e.c.useful and (not best or e.c.hpm > best.c.hpm) then best = e end
+    end
+    return best
+end
