@@ -8,9 +8,9 @@ Do these steps in order. **Do them all in one play session.** The beta has a bug
 
 1. Download `EarthenShrinkExport.zip` from the thread.
 2. Unzip it. You'll get a folder called `EarthenShrinkExport`.
-3. Put that folder here: `World of Warcraft\_classic_beta_\Interface\AddOns\`
+3. Put that folder here: `World of Warcraft\_forever_\Interface\AddOns\`
    - The final path should be `...\AddOns\EarthenShrinkExport\EarthenShrinkExport.toc`
-   - If you can't find `_classic_beta_`, look for the folder that has the Forever Beta's `Wow.exe` in it.
+   - If you can't find `_forever_`, look for the folder that has the Forever `Wow.exe` in it.
 4. Start the game. On the character screen, open **AddOns** and make sure **Earthen Shrink Export** is checked. If it says "out of date", tick **Load out of date AddOns**.
 
 ## 2. In game, before you start
@@ -44,7 +44,7 @@ This lets us calculate the real spell power formulas.
 1. Type `/reload` **once**. This writes the file.
 2. Close the game (this is safest).
 3. Find this file on your PC:
-   `World of Warcraft\_classic_beta_\WTF\Account\<YOUR ACCOUNT NAME>\SavedVariables\EarthenShrinkExport.lua`
+   `World of Warcraft\_forever_\WTF\Account\<YOUR ACCOUNT NAME>\SavedVariables\EarthenShrinkExport.lua`
 4. Upload that file in the thread.
 
 ## If something goes wrong
