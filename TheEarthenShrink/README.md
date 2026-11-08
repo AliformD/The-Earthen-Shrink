@@ -4,10 +4,16 @@ A Shaman helper for World of Warcraft: Forever. Type `/es` in game to open it.
 
 ## Install
 
-1. Copy the `TheEarthenShrink` folder into `World of Warcraft\_classic_\Interface\AddOns\`
-   (use the folder that has the Forever `Wow.exe` in it).
-2. The final path should be `...\AddOns\TheEarthenShrink\TheEarthenShrink.toc`.
-3. On the character screen, open **AddOns** and make sure **The Earthen Shrink** is ticked.
+1. Copy the `TheEarthenShrink` folder into `World of Warcraft\_forever_\Interface\AddOns\`
+   (not `_classic_` or `_retail_`).
+2. The final path should be `...\_forever_\Interface\AddOns\TheEarthenShrink\TheEarthenShrink.toc`.
+   There's also a `TheEarthenShrink_Forever.toc` next to it. Keep both; the game picks the one it wants.
+3. Close the game fully and start it again (`/reload` doesn't find new addons).
+4. On the character screen, open **AddOns**, set the dropdown at the top to **All characters**,
+   and make sure **The Earthen Shrink** is ticked. If it says "out of date", tick **Load out of date AddOns**.
+
+If it still doesn't show up, type `/dump select(4, GetBuildInfo())` in game. The number it prints must
+match the `## Interface:` line at the top of both .toc files (currently 16001).
 
 ## Tabs
 

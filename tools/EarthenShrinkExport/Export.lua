@@ -11,7 +11,7 @@
 --   /esx status     show what has been saved this session
 --
 -- The file is written when you type /reload or log out:
---   World of Warcraft\_classic_beta_\WTF\Account\<ACCOUNT>\SavedVariables\EarthenShrinkExport.lua
+--   World of Warcraft\_forever_\WTF\Account\<ACCOUNT>\SavedVariables\EarthenShrinkExport.lua
 
 local ADDON = ...
 local VERSION = "0.1.0"

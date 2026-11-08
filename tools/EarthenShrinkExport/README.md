@@ -23,7 +23,7 @@ don't need screenshots of every tooltip. It only reads data. It never casts or c
 The file is only written to disk when you type `/reload` or log out. It lands here:
 
 ```
-World of Warcraft\_classic_beta_\WTF\Account\<YOUR ACCOUNT>\SavedVariables\EarthenShrinkExport.lua
+World of Warcraft\_forever_\WTF\Account\<YOUR ACCOUNT>\SavedVariables\EarthenShrinkExport.lua
 ```
 
 See [docs/angel-checklist.md](../../docs/angel-checklist.md) for the step-by-step list.
