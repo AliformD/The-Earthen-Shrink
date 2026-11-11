@@ -263,6 +263,11 @@ local function readRank(spell, id, rank, guessLevel)
     elseif k == "shield" then
         rec.shield = SD.ParseShield(rec.desc)
         rec.parsed = rec.shield ~= nil
+    elseif k == "strike" then
+        -- e.g. "deals 150% weapon damage". nil if the tooltip doesn't say.
+        local pct = rec.desc and rec.desc:lower():match("(%d+)%% [%a ]-weapon damage")
+        rec.strikePct = pct and tonumber(pct) / 100 or nil
+        rec.parsed = rec.desc ~= nil
     else
         rec.parsed = rec.desc ~= nil
     end

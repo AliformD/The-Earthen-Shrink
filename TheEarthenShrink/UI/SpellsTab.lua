@@ -121,7 +121,8 @@ local function makeRow(e, p, best, maxDpm, refDmg)
                 })
             elseif c and spell.kind == "strike" then
                 W.AddMath(tt, {
-                    ("One weapon hit with crit: %s"):format(f(c.expected, 1)),
+                    ("%s%% weapon damage (%s)"):format(f(c.pct * 100), c.pctFromGame and "from the tooltip" or "guess, not from the tooltip"),
+                    ("One hit with crit: %s"):format(f(c.expected, 1)),
                     ("%s ÷ %s mana = %s damage per mana"):format(f(c.expected, 1), f(c.mana), f(c.dpm, 2)),
                     "Its bonus to your next Lightning Bolt, Chain Lightning or Earth Shock is not added here.",
                 })

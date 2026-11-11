@@ -163,14 +163,21 @@ function M.CalcShield(spell, rank, p)
     return c
 end
 
+-- 🔶 Stormstrike weapon damage share. Used only if the tooltip doesn't give a %.
+-- 1.5 = 150%, from the Nov 2 beta notes as quoted by a player (not checked yet).
+-- Those notes also say "normalized": the attack power part may use a fixed
+-- weapon speed instead of yours. We use your real speed until that's tested.
+M.RULES.strikePct = 1.5
+
 -- Stormstrike: one weapon hit. (Its +20% on your next shock or bolt is not added here.)
 function M.CalcStrike(spell, rank, p)
     if not rank or not rank.mana or rank.mana <= 0 then return nil end
     local w = p.weapon
     if not (w and w.min and w.speed) then return nil end
     local IR = ns.ImbueMath.RULES
-    local hit = (w.min + w.max) / 2 + (p.ap or 0) / IR.apPerDps * w.speed
-    local c = { mana = rank.mana, time = M.RULES.gcd }
+    local pct = rank.strikePct or M.RULES.strikePct
+    local hit = ((w.min + w.max) / 2 + (p.ap or 0) / IR.apPerDps * w.speed) * pct
+    local c = { mana = rank.mana, time = M.RULES.gcd, pct = pct, pctFromGame = rank.strikePct ~= nil }
     c.expected = hit * (1 + (p.meleeCrit or 0) / 100 * IR.meleeCritBonus)
     c.dpm = c.expected / rank.mana
     c.dps = c.expected / c.time
