@@ -163,11 +163,10 @@ function M.CalcShield(spell, rank, p)
     return c
 end
 
--- 🔶 Stormstrike weapon damage share. Used only if the tooltip doesn't give a %.
--- 1.5 = 150%, from the Nov 2 beta notes as quoted by a player (not checked yet).
--- Those notes also say "normalized": the attack power part may use a fixed
--- weapon speed instead of yours. We use your real speed until that's tested.
-M.RULES.strikePct = 1.5
+-- Stormstrike weapon damage share. Used only if the tooltip doesn't give a %.
+-- 1.0 = 100%. The Nov 2 beta notes raised it to 150%, but the 2026-11-10
+-- hotfix put it back to 100% with an 8 sec cooldown (Angel, in game).
+M.RULES.strikePct = 1.0
 
 -- Stormstrike: one weapon hit. (Its +20% on your next shock or bolt is not added here.)
 function M.CalcStrike(spell, rank, p)

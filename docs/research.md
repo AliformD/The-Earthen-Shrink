@@ -132,7 +132,7 @@ Intellect turning into attack power AND spell power AND mana is a big reason Enh
 ✅ From Blizzard:
 - All four imbues last **60 minutes** (was 5).
 - They stack with sharpening stones, weightstones and wizard oils.
-- Windfury and Flametongue are **also party totems** now. If the buff is already on your weapon, the matching totem does nothing for you.
+- Windfury and Flametongue are **also party totems** now. If the buff is already on your weapon, the matching totem does nothing for you. **Update (2026-11-10 hotfix, reported by Angel from in game): Windfury Totem and Windfury Weapon now stack.**
 - Windfury Totem and Flametongue Totem can't both be on a party. Windfury Totem also can't be up with Grace of Air.
 
 So the best setup is usually to "cross" them, for example Flametongue on your weapon and Windfury Totem for the party.
