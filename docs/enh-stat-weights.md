@@ -118,8 +118,43 @@ These sources disagree:
 6. Character panel **Strength** and **Attack Power** tooltips (confirms 2 AP per Strength and 14 AP per DPS).
 7. Does the character panel show **haste** anywhere?
 
+---
+
+## 6. Spell power coefficients (how much spell power each spell gets)
+
+A **coefficient** is the share of your spell power added to a spell. 0.43 means "+43% of your spell power". So with 100 spell power, a 0.43 spell hits for 43 more.
+
+**No Forever source lists coefficients for the shocks, Lightning Shield or totems yet.** Only Lightning Bolt and Chain Lightning have them. So most of this table is still the old Classic rule the addon uses (cast time ÷ 3.5, instant spells count as 1.5 sec).
+
+| Spell | Coefficient | +damage per 100 spell power | Trust |
+|---|---|---|---|
+| Lightning Bolt (rank 4+, 2.5 sec cast) | 0.714 | +71 | 🟡 ForeverChanges spellbook, build 1.60.1.70888 (after the Nov 10 hotfix). Fits cast ÷ 3.5. |
+| Chain Lightning | 0.714 (Nov 4) or 0.357 (Nov 11)? | +71 or +36 on the first target | ❓ ForeverDB lists both. They don't agree. |
+| Earth Shock | 0.43 | +43 (+20% after Stormstrike) | 🔶 rule (instant = 1.5 ÷ 3.5) |
+| Frost Shock | 0.43 | +43 | 🔶 rule |
+| Flame Shock, hit | 0.15 | +15 | 🔶 rule (split between hit and burn) |
+| Flame Shock, burn over 12 sec | 0.52 | +52 total | 🔶 rule |
+| Lightning Shield, per charge | 0.33 | +33 | 🔶 guess |
+| Searing Totem, per hit | 0.08 | +8 | 🔶 guess |
+| Fire Nova, per enemy | 0.14 to 0.21 | +14 to +21 | 🟡 a player's estimate (0.143, before the Oct 16 change) / 🔶 rule |
+| Stormstrike, Windfury, Flametongue Weapon | none | 0 | Weapon and attack power only. (Flametongue's fire damage depends on weapon speed.) |
+
+### How we can measure the real numbers
+
+This is quick to do in game, and it's the only way to be sure:
+
+1. Hover a spell and write down its damage.
+2. Take off one item that has spell power (write down how much it had).
+3. Hover the spell again.
+4. **Coefficient = damage change ÷ spell power change.** Example: Earth Shock drops from 420 to 399 after removing a +50 spell power item. 21 ÷ 50 = 0.42.
+
+If the number changes, Forever tooltips already include your spell power, so type `/es sptooltip on` (otherwise the addon would add it twice). If it doesn't change, leave it off (the default).
+
 ## Sources
 
 - [Warcraft Tavern: Forever Enhancement guide](https://www.warcrafttavern.com/forever/guides/enhancement-shaman/)
 - [wow.gg: Forever Enhancement overview](https://wow.gg/guides/shaman-enhancement-forever-overview)
+- [ForeverChanges spellbook (build 1.60.1.70888)](https://foreverchanges.pro/spellbook/shaman)
+- [ForeverDB shaman changes](https://foreverdb.net/buffs-and-nerfs/shaman)
+- [Blizzard forums: "The Big Shaman Fixlist" (player posts)](https://us.forums.blizzard.com/en/wow/t/the-big-shaman-fixlist/2378811)
 - [Blizzard forums: "New enh changes" (player post quoting Nov 2 beta notes)](https://us.forums.blizzard.com/en/wow/t/new-enh-changes/2399691)
