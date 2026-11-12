@@ -227,6 +227,7 @@ end
 
 function T.Clear(t, which)
     T.Test(t)[which] = { hits = {} }
+    T.Test(t)["tip_" .. which] = nil
     ns.refresh("coef")
 end
 
@@ -236,16 +237,121 @@ function T.Result(t)
 end
 
 ---------------------------------------------------------------------------
+-- Tooltip method: Forever's tooltips change with your spell power, so the
+-- change in the tooltip numbers IS the coefficient. No typing, no crits,
+-- no random rolls. The only noise is that tooltips round to whole numbers.
+---------------------------------------------------------------------------
+
+-- The damage numbers in the tooltip right now, for this test.
+-- Returns { min, max } (for ticks: the whole damage over time), or nil.
+function T.ReadTooltip(t)
+    local rec = ns.SpellData.ReadRank(t.spell, t.rank)
+    if not rec then return nil end
+    if t.part == "direct" and rec.dmg and rec.dmg.max and rec.dmg.max > 0 then
+        return { min = rec.dmg.min, max = rec.dmg.max }
+    elseif t.part == "tick" and rec.dmg and rec.dmg.dot then
+        return { min = rec.dmg.dot, max = rec.dmg.dot }
+    elseif t.part == "proc" and rec.imbue and rec.imbue.min then
+        return { min = rec.imbue.min, max = rec.imbue.max }
+    elseif t.part == "totem" and rec.totem and rec.totem.min then
+        return { min = rec.totem.min, max = rec.totem.max }
+    end
+    return nil
+end
+
+-- Saves the tooltip numbers and your spell power into Before or After.
+-- Returns the numbers, or nil + a message.
+function T.SnapshotTooltip(t, which)
+    which = which or T.Active()
+    local sp = T.CurrentSP(t)
+    if not sp then return nil, "The game is hiding your spell power right now (in combat?). Try after the fight." end
+    local tip = T.ReadTooltip(t)
+    if not tip then return nil, "Couldn't read damage numbers from this tooltip." end
+    tip.sp = sp
+    T.Test(t)["tip_" .. which] = tip
+    ns.refresh("coef")
+    return tip
+end
+
+local function isWhole(v) return math.abs(v - math.floor(v + 0.5)) < 1e-6 end
+
+-- Coefficient from the two tooltip readings. Same fields as CoefMath.Estimate.
+function T.TooltipResult(t)
+    local test = T.Test(t)
+    local a, b = test.tip_before, test.tip_after
+    local R = ns.CoefMath.RULES
+    local r = { method = "tooltip", tipBefore = a, tipAfter = b, ticks = T.Ticks(t) }
+    if not (a and b) then r.verdict = "wait"; return r end
+    r.dSP = b.sp - a.sp
+    if r.dSP == 0 then
+        r.verdict, r.why = "wait", "Both tooltip readings have the same spell power. Change your gear between them."
+        return r
+    end
+    r.dMean = ((b.min + b.max) - (a.min + a.max)) / 2
+    -- Each tooltip number can be rounded by up to 0.5, so a change can be
+    -- off by up to 1. Numbers with decimals are much more exact.
+    local err = (isWhole(a.min) and isWhole(a.max) and isWhole(b.min) and isWhole(b.max)) and 1 or 0.02
+    local perUse = r.dMean / r.dSP
+    r.margin = err / math.abs(r.dSP)
+    if t.part == "tick" then
+        r.total, r.totalMargin = perUse, r.margin           -- the whole damage over time
+        r.coef = perUse / r.ticks
+    else
+        r.coef, r.total, r.totalMargin = perUse, perUse, r.margin
+    end
+    if r.totalMargin <= R.goodMargin then r.verdict = "good"
+    elseif r.totalMargin <= R.okMargin then r.verdict = "ok"
+    else r.verdict = "rough" end
+    -- Proof that tooltips include spell power: switch the setting on once.
+    local db = ns.db()
+    if r.dMean ~= 0 and not db.tooltipIncludesSpellPower then
+        db.tooltipIncludesSpellPower = true
+        ns.say("your tooltips change with spell power, so the addon now knows they already include it (/es sptooltip).")
+    end
+    return r
+end
+
+-- The better of the two methods (smaller ±), and the other one.
+function T.BestResult(t)
+    local hits, tip = T.Result(t), T.TooltipResult(t)
+    hits.method = "hits"
+    local hitsOk, tipOk = hits.verdict ~= "wait", tip.verdict ~= "wait"
+    if tipOk and (not hitsOk or tip.totalMargin <= hits.totalMargin) then return tip, hits end
+    return hits, tip
+end
+
+---------------------------------------------------------------------------
 -- Saving a result for the Spells tab and Sim Lab
 ---------------------------------------------------------------------------
 
+-- Results measured in Forever that ship with the addon. Your own saved
+-- result for the same spell and rank always wins over these.
+T.SEEDS = {
+    LB = { [6] = { direct = {
+        coef = 17 / 24, total = 17 / 24, margin = 1 / 24, totalMargin = 1 / 24, dSP = 24,
+        method = "tooltip", verdict = "good", date = "2026-11-12", seed = true,
+        -- Angel's Forever tooltip, no Wizard Oil: 150 to 169 at 13 spell
+        -- power, 167 to 186 at 37. Both ends +17. Tooltips round to whole
+        -- numbers, so the true answer is somewhere in 0.67 to 0.75.
+        note = "Angel's Forever tooltip: 150-169 at 13 SP, 167-186 at 37 SP",
+    } } },
+}
+
+-- Your saved results for one rank, with the shipped ones filled in.
+-- Returns a table like { direct = {...}, tick = {...} }.
 function T.Saved(key, rank)
     local s = db().coefSaved[key]
-    return s and s[rank] or {}
+    local mine = s and s[rank] or {}
+    local seed = T.SEEDS[key] and T.SEEDS[key][rank]
+    if not seed then return mine end
+    local out = {}
+    for part, v in pairs(seed) do out[part] = v end
+    for part, v in pairs(mine) do out[part] = v end
+    return out
 end
 
 function T.Save(t)
-    local r = T.Result(t)
+    local r = T.BestResult(t)
     if not (r.verdict == "good" or r.verdict == "ok") then return false end
     local saved = db().coefSaved
     local key, rank = t.spell.key, t.rank.rank
@@ -253,7 +359,8 @@ function T.Save(t)
     saved[key][rank] = saved[key][rank] or {}
     saved[key][rank][t.part] = {
         coef = r.coef, total = r.total, margin = r.margin, totalMargin = r.totalMargin,
-        ticks = r.ticks, dSP = r.dSP, hitsBefore = r.before.n, hitsAfter = r.after.n,
+        ticks = r.ticks, dSP = r.dSP, method = r.method,
+        hitsBefore = r.before and r.before.n or 0, hitsAfter = r.after and r.after.n or 0,
         verdict = r.verdict, date = date and date("%Y-%m-%d") or nil,
     }
     ns.say(("saved: %s rank %d %s = %s ± %s. The Spells tab and Sim Lab use it now."):format(

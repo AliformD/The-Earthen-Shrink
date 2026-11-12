@@ -481,3 +481,39 @@ print("button:", sim.mentalQuick._text)
 dumpSim("Mental Quickness 1 + Mental Dexterity")
 for _, row in ipairs(sim.list.rows) do if row._shown and row.data.name == "1 Intellect (compare)" then tlines = {}; row.data.tooltip(GameTooltip); for _, l in ipairs(tlines) do print("     tt: " .. l) end end end
 print("mental quickness tests passed")
+
+-- Tooltip method (Forever tooltips go up with spell power) ----------------------
+FAKE_SP = 64
+ns.SpellData.Rebuild()
+SlashCmdList.THEEARTHENSHRINK("test")
+local lbT = pick("Lightning Bolt")
+CT.Clear(lbT, "before"); CT.Clear(lbT, "after")
+ns.db().coefSaved.LB = nil
+ct.before._scripts.OnClick()
+ct.readTip._scripts.OnClick()
+print("read msg:", ct.msg._text)
+local oldDesc = SPELLS[943].desc
+SPELLS[943].desc = "Casts a bolt of lightning at the target for 1,148 to 1,166 Nature damage."
+FAKE_SP = 88
+ct.after._scripts.OnClick()
+ct.readTip._scripts.OnClick()
+dumpCoef("tooltip method, +24 SP, both ends +17")
+local tr = CT.TooltipResult(lbT)
+print("tooltip coef", tr.coef, "±", tr.margin, tr.verdict)
+assert(math.abs(tr.coef - 17/24) < 1e-9 and tr.verdict == "good")
+ct.save._scripts.OnClick()
+assert(ns.db().coefSaved.LB[lbT.rank.rank].direct.method == "tooltip")
+-- No double counting: at the spell power the tooltip was read with, the math
+-- gives the tooltip's own average.
+ns.db().tooltipIncludesSpellPower = true
+ns.SpellData.Rebuild()
+local rk = ns.SpellData.Best("LB", 30)
+local cc = ns.SpellMath.Calc(ns.RANKS_BY_KEY.LB, rk, ns.Profile.Player())
+print("spRead", rk.spRead, "direct", cc.direct, "tooltip avg", (1148 + 1166) / 2)
+assert(math.abs(cc.direct - 1157) < 1e-9)
+SPELLS[943].desc = oldDesc
+-- Built-in Lightning Bolt rank 6 result from Angel's tooltip
+local seed = CT.Saved("LB", 6).direct
+print("seed LB 6:", seed.coef, seed.totalMargin, seed.note)
+assert(seed.seed and math.abs(seed.coef - 0.7083) < 0.001)
+print("tooltip method tests passed")

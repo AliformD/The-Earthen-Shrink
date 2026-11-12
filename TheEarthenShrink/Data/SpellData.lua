@@ -250,6 +250,11 @@ local function readRank(spell, id, rank, guessLevel)
         return nil
     end
     rec.nameOK = true
+    -- Your spell power when this tooltip was read. Forever's tooltips go up
+    -- with your spell power (Angel saw it on Flametongue), so the math
+    -- needs to know how much is already inside the numbers.
+    local idx = ns.Profile and ns.Profile.SCHOOL_INDEX[spell.school or (spell.key:match("^FT") and "Fire") or "Nature"]
+    rec.spRead = idx and ns.clean(ns.try(GetSpellBonusDamage, idx)) or nil
     rec.icon = type(info) == "table" and ns.clean(info.iconID) or nil
 
     local lines = tooltipLines(id)
@@ -305,6 +310,11 @@ end
 ---------------------------------------------------------------------------
 -- Building the full list
 ---------------------------------------------------------------------------
+
+-- Reads one rank again right now (used by the SP Test "Read tooltip").
+function SD.ReadRank(spell, rank)
+    return readRank(spell, rank.id, rank.rank, rank.level)
+end
 
 -- Spells in your spellbook that match one of our spell names.
 local function spellbookRanks()
@@ -437,6 +447,8 @@ ns.on("SPELL_DATA_LOAD_RESULT", function(id)
     if pending[id] then pending[id] = nil; queueRebuild() end
 end)
 ns.on("SPELLS_CHANGED", queueRebuild)
+-- New gear = new spell power = new tooltip numbers.
+ns.on("PLAYER_EQUIPMENT_CHANGED", queueRebuild)
 ns.on("TRAINER_SHOW", function() C_Timer.After(1, readTrainer) end)
 
 -- /es check: shows what the addon could read, so we can spot problems.

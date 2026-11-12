@@ -13,6 +13,8 @@ local T = {}
 ns.Tabs = ns.Tabs or {}
 ns.Tabs.coef = T
 local f = function(...) return ns.fmt(...) end
+-- Tooltip numbers: "150" for whole numbers, "4.7" otherwise.
+local function tn(v) return ns.fmt(v, math.abs(v - math.floor(v + 0.5)) < 1e-6 and 0 or 1) end
 
 local RED = { 1, 0.29, 0.23 }
 local YELLOW = { 1, 0.82, 0 }
@@ -93,7 +95,7 @@ local function buildEntry(page, x, width)
     page.entryLabel = label
 
     local input = W.Create("EditBox", nil, box, { "InputBoxTemplate" })
-    input:SetSize(width - 120, 20)
+    input:SetSize(width - 230, 20)
     input:SetPoint("TOPLEFT", 16, -22)
     input:SetAutoFocus(false)
     if input.SetMaxLetters then input:SetMaxLetters(400) end
@@ -103,6 +105,31 @@ local function buildEntry(page, x, width)
     end)
     input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     page.input = input
+
+    local read = W.Button(box, "Read tooltip", 100)
+    read:SetHeight(20)
+    read:SetPoint("TOPRIGHT", -94, -22)
+    read:SetScript("OnClick", function()
+        local t = T.target
+        if not t then return end
+        local tip, err = ns.CoefTest.SnapshotTooltip(t)
+        if tip then
+            T.message = ("Saved the tooltip in %s: %s at %s spell power."):format(ns.CoefTest.Active():upper(),
+                tip.min == tip.max and tn(tip.min) or (tn(tip.min) .. " to " .. tn(tip.max)), f(tip.sp))
+            T.messageColor = W.GREEN
+        else
+            T.message, T.messageColor = err, RED
+        end
+        T.Update(page)
+    end)
+    read:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Read tooltip", 1, 1, 1)
+        GameTooltip:AddLine("Saves the damage numbers in the spell's tooltip, and your spell power, into the box you clicked. In Forever the tooltip goes up with spell power, so BEFORE and AFTER readings give the coefficient without typing hits.", 1, 0.82, 0, true)
+        GameTooltip:Show()
+    end)
+    read:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    page.readTip = read
 
     local undo = W.Button(box, "Undo", 80)
     undo:SetHeight(20)
@@ -124,7 +151,7 @@ local function buildEntry(page, x, width)
     if ns.CoefTest.autoAvailable then
         local cb = W.Create("CheckButton", nil, box, { "UICheckButtonTemplate", "ChatConfigCheckButtonTemplate" })
         cb:SetSize(20, 20)
-        cb:SetPoint("TOPRIGHT", -96, -21)
+        cb:SetPoint("TOPRIGHT", -198, -21)
         cb:SetScript("OnClick", function(self) ns.CoefTest.autoOn = self:GetChecked() and true or false; T.Update(page) end)
         cb:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -239,15 +266,20 @@ end
 -- Update
 ---------------------------------------------------------------------------
 
-local function sampleText(s, stats, spNow, active)
+local function sampleText(s, stats, spNow, active, tip)
     local lines = {}
-    lines[#lines + 1] = "Spell power: " .. (s.sp and f(s.sp) or (spNow and ("|cff999999" .. f(spNow) .. " (now)|r") or "?"))
+    local sp = s.sp or (tip and tip.sp)
+    lines[#lines + 1] = "Spell power: " .. (sp and f(sp) or (spNow and ("|cff999999" .. f(spNow) .. " (now)|r") or "?"))
+    if tip then
+        lines[#lines + 1] = "Tooltip: " .. (tip.min == tip.max and tn(tip.min) or (tn(tip.min) .. " to " .. tn(tip.max)))
+            .. ((s.sp and tip.sp ~= s.sp) and (" |cff999999(at " .. f(tip.sp) .. " SP)|r") or "")
+    end
     lines[#lines + 1] = "Hits: " .. stats.n
     if stats.n > 0 then
         lines[#lines + 1] = "Average: " .. f(stats.mean, 1)
         lines[#lines + 1] = "|cff999999From " .. f(stats.low) .. " to " .. f(stats.high) .. "|r"
     elseif active then
-        lines[#lines + 1] = "|cff999999Type numbers below.|r"
+        lines[#lines + 1] = "|cff999999Read tooltip, or type hits.|r"
     end
     return table.concat(lines, "\n")
 end
@@ -322,8 +354,8 @@ function T.Update(page)
     local active = CT.Active()
     local spNow = CT.CurrentSP(t)
     local res = CT.Result(t)
-    page.before.body:SetText(sampleText(test.before, res.before, active == "before" and spNow or nil, active == "before"))
-    page.after.body:SetText(sampleText(test.after, res.after, active == "after" and spNow or nil, active == "after"))
+    page.before.body:SetText(sampleText(test.before, res.before, active == "before" and spNow or nil, active == "before", test.tip_before))
+    page.after.body:SetText(sampleText(test.after, res.after, active == "after" and spNow or nil, active == "after", test.tip_after))
     paintBox(page.before, active == "before")
     paintBox(page.after, active == "after")
 
@@ -354,12 +386,14 @@ function T.Update(page)
     page.tickPlus:SetShown(isTick)
     if isTick then page.ticksLabel:SetText(("Ticks per cast: %d (count them)"):format(ticks)) end
 
-    -- Result
+    -- Result: the tooltip method and the typed-hits method. The one with
+    -- the smaller ± is shown big; the other is a double-check.
+    local best, other = CT.BestResult(t)
     local rule = CT.RuleCoef(t)
     local ruleTotal = rule and rule * ticks
     local lines = {}
     local function add(s) lines[#lines + 1] = s end
-    local v = VERDICT[res.verdict] or VERDICT.wait
+    local v = VERDICT[best.verdict] or VERDICT.wait
     page.verdict:SetText(v[1])
     page.verdict:SetTextColor(v[2][1], v[2][2], v[2][3])
 
@@ -368,82 +402,82 @@ function T.Update(page)
     local spread
     if res.before.n >= C.RULES.minHits then spread = res.before.sd
     else spread = t.spread or 0 end
+    local tip = best.method == "tooltip" and best or other
+    local function tipRange(x)
+        if not x then return "?" end
+        return x.min == x.max and tn(x.min) or (tn(x.min) .. " to " .. tn(x.max))
+    end
 
-    if res.verdict == "wait" then
+    if best.verdict == "wait" then
         page.big:SetText("?")
         page.big:SetTextColor(0.6, 0.6, 0.6)
-        if res.before.n == 0 and res.after.n == 0 then
-            add("|cffffd1001.|r Click BEFORE. Use " .. t.spell.name .. " on a mob and type " .. what .. ".")
-            add("|cffffd1002.|r Put on gear with more spell power (Intellect counts too, with Mental Quickness).")
-            add("|cffffd1003.|r Click AFTER and do the same.")
+        local anyData = res.before.n + res.after.n > 0 or test.tip_before or test.tip_after
+        if not anyData then
+            add("|cffffd1001.|r Click BEFORE and press |cffffd100Read tooltip|r.")
+            add("|cffffd1002.|r Put on spell power gear (Intellect counts too, with Mental Quickness).")
+            add("|cffffd1003.|r Click AFTER and press |cffffd100Read tooltip|r again.")
         else
-            add(res.why)
-            -- Gear already changed? Use the real change for the plan.
-            local dSP = test.before.sp and spNow and (spNow - test.before.sp)
-            if res.dSP ~= 0 and test.after.sp and test.before.sp then dSP = res.dSP end
-            if dSP and dSP ~= 0 then
-                local n = C.HitsNeeded(spread, dSP, C.RULES.okMargin, ticks)
-                add(("With your %+d spell power: %s"):format(dSP,
-                    n and ("about " .. f(n) .. " hits in each box.") or "|cffff4a3anot enough to see a change. Add more spell power.|r"))
+            if test.tip_before and not test.tip_after then
+                add("Tooltip BEFORE saved. Put on your gear, click AFTER and press Read tooltip.")
+            elseif tip.why then
+                add(tip.why)
             end
+            if res.before.n + res.after.n > 0 then add(res.why) end
         end
-        add("|cffffd100Hits needed in each box, by spell power added:|r")
+        add("|cffffd100To double-check with real hits, type them too. Hits needed in each box:|r")
         add(planner(t, spread, { 5, 10, 20, 40 }))
-        if (spread or 0) < 0.5 then
-            local need = C.SpellPowerNeeded(C.RULES.okMargin, ticks)
-            add(("These hits are usually the same number every time, so typing more of them doesn't help much. You need about +%d spell power%s."):format(
-                need, rule and (". With +5, each grows only about " .. f(rule * 5, 2)) or ""))
-            if t.part == "proc" then
-                add("|cff999999Nobody knows yet if Flametongue gets spell power in Forever. A result near 0 is a real answer too.|r")
-            end
-        elseif rule then
-            add(("With +5 spell power each hit grows only about %s, but hits jump around by %s. That's why it takes many hits."):format(
-                f(rule * 5, 1), f(t.high - t.low)))
-        else
-            add(("Hits jump around by %s, so it takes many hits. Nobody knows yet how much spell power this gets in Forever."):format(f(t.high - t.low)))
+        if t.part == "proc" then
+            add("|cff999999Nobody knows yet how much spell power Flametongue gets in Forever. Near 0 is a real answer too.|r")
         end
     else
-        page.big:SetText(f(res.total, 3) .. "  ± " .. f(res.totalMargin, 3))
+        page.big:SetText(f(best.total, 3) .. "  ± " .. f(best.totalMargin, 3))
         local col = v[2]
         page.big:SetTextColor(col[1], col[2], col[3])
-        if res.why then add("|cffff4a3a" .. res.why .. "|r") end
-        add(("%+d spell power made each %s %s bigger on average (%s to %s)."):format(
-            res.dSP, t.part == "tick" and "tick" or "hit", f(res.dMean, 1), f(res.before.mean, 1), f(res.after.mean, 1)))
-        if t.part == "tick" then
-            add(("Per tick %s × %d ticks = %s of your spell power for the whole spell."):format(f(res.coef, 3), ticks, f(res.total, 3)))
+        if best.why then add("|cffff4a3a" .. best.why .. "|r") end
+        if best.method == "tooltip" then
+            add(("Tooltip: %s with %s spell power, %s with %s (%+d)."):format(
+                tipRange(best.tipBefore), f(best.tipBefore.sp), tipRange(best.tipAfter), f(best.tipAfter.sp), best.dSP))
         else
-            add(("So each point of spell power adds about %s damage."):format(f(res.coef, 2)))
+            add(("%+d spell power made each %s %s bigger on average (%s to %s)."):format(
+                best.dSP, t.part == "tick" and "tick" or "hit", f(best.dMean, 1), f(best.before.mean, 1), f(best.after.mean, 1)))
+        end
+        if t.part == "tick" then
+            add(("= %s of your spell power for the whole damage over time (%s per tick)."):format(f(best.total, 3), f(best.coef, 3)))
+        else
+            add(("So each point of spell power adds about %s damage."):format(f(best.coef, 2)))
         end
         if ruleTotal then
             add(("Old Classic rule says %s |cff999999(not tested in Forever)|r."):format(f(ruleTotal, 3)))
         end
-        local w = CT.Weight(t, res.total)
+        local w = CT.Weight(t, best.total)
         if w and w.strEq then
             add(("Stat weight: 1 spell power here = %s DPS = about %s Strength |cff999999(if used every %s sec)|r."):format(
                 f(w.dps, 3), f(w.strEq, 2), f(t.every, 1)))
         end
-        if res.before.roundingLimited and res.after.roundingLimited then
-            add("Every number was the same, so more hits won't help. More spell power will.")
-        elseif res.verdict ~= "good" then
-            local n = C.HitsNeeded(math.max(res.before.sd, res.after.sd), res.dSP, C.RULES.goodMargin, ticks)
-            add(n and ("For a Good result: about %s hits in each box."):format(f(n))
-                or "For a Good result you need a bigger spell power change.")
-        end
-        if not (w and w.strEq) then
-            add("|cff999999Same mob type, no buffs or debuffs that change damage (like Stormstrike).|r")
+        -- Double-check with the other method.
+        if other.verdict ~= "wait" then
+            add(("Double-check (%s): %s ± %s."):format(other.method == "tooltip" and "tooltip" or "typed hits",
+                f(other.total, 3), f(other.totalMargin, 3)))
+        elseif best.method == "tooltip" then
+            add("|cff999999Tooltips round to whole numbers; that's the ±. Type real hits too to double-check.|r")
+        elseif best.verdict ~= "good" then
+            add("|cff999999Press Read tooltip on BEFORE and AFTER for a quicker, cleaner number.|r")
         end
     end
     page.body:SetText(table.concat(lines, "\n"))
 
     -- Save
     local saved = CT.Saved(t.spell.key, t.rank.rank)[t.part]
-    local canSave = res.verdict == "good" or res.verdict == "ok"
+    local canSave = best.verdict == "good" or best.verdict == "ok"
     if page.save.SetEnabled then page.save:SetEnabled(canSave) end
-    page.forget:SetShown(saved ~= nil)
-    if saved then
-        page.saved:SetText(("|cff1eff00Saved: %s ± %s|r (%d + %d hits, %+d SP%s). Used by Spells and Sim Lab."):format(
-            f(saved.total, 3), f(saved.totalMargin, 3), saved.hitsBefore or 0, saved.hitsAfter or 0, saved.dSP or 0,
-            saved.date and (", " .. saved.date) or ""))
+    page.forget:SetShown(saved ~= nil and not saved.seed)
+    if saved and saved.seed then
+        page.saved:SetText(("|cff1eff00Built in: %s ± %s|r (%s). Used by Spells and Sim Lab until you save your own."):format(
+            f(saved.total, 3), f(saved.totalMargin, 3), saved.note or "measured in Forever"))
+    elseif saved then
+        local how = saved.method == "tooltip" and "tooltip" or (("%d + %d hits"):format(saved.hitsBefore or 0, saved.hitsAfter or 0))
+        page.saved:SetText(("|cff1eff00Saved: %s ± %s|r (%s, %+d SP%s). Used by Spells and Sim Lab."):format(
+            f(saved.total, 3), f(saved.totalMargin, 3), how, saved.dSP or 0, saved.date and (", " .. saved.date) or ""))
     else
         page.saved:SetText(canSave and "Save it so the Spells tab and Sim Lab use it." or "")
     end

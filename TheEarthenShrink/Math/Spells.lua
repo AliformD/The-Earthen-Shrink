@@ -70,17 +70,23 @@ function M.Calc(spell, rank, profile)
     if not rank or not rank.dmg or not rank.mana or rank.mana <= 0 then return nil end
     local R, d = M.RULES, rank.dmg
     local sp = (profile.sp and profile.sp[spell.school or "Nature"]) or 0
-    if ns.db().tooltipIncludesSpellPower then sp = 0 end
     local directC, dotC, penalty, src = M.Coefficients(spell, rank)
 
     local avgBase = (d.min + d.max) / 2
+    local dotBase = d.dot or 0
+    -- If the tooltip already has your spell power in it, take that part out
+    -- first, so it isn't counted twice (and the Sim Lab can change it).
+    local inTip = ns.db().tooltipIncludesSpellPower and (rank.spRead or 0) or 0
+    avgBase = math.max(0, avgBase - inTip * directC)
+    if d.dot then dotBase = math.max(0, dotBase - inTip * dotC) end
     local direct = avgBase + sp * directC
-    local dot = (d.dot or 0) + (d.dot and sp * dotC or 0)
+    local dot = d.dot and (dotBase + sp * dotC) or 0
     local hit = math.min(R.maxSpellHit, R.baseSpellHit + (profile.spellHit or 0)) / 100
     local critMult = 1 + (profile.spellCrit or 0) / 100 * R.spellCritBonus
 
     local c = {}
     c.sp, c.directC, c.dotC, c.penalty, c.coefSource = sp, directC, dotC, penalty, src
+    c.inTip = inTip
     c.avgBase, c.direct, c.dot, c.hit, c.critMult = avgBase, direct, dot, hit, critMult
     c.expected = (direct * critMult + dot) * hit        -- dots don't crit (🔶)
     c.time = math.max(rank.cast or 0, R.gcd)
@@ -99,7 +105,11 @@ function M.Explain(spell, rank, c)
     local d = rank.dmg
     local lines = {}
     local base = d.min == d.max and f(d.min) or (f(d.min) .. " to " .. f(d.max))
-    lines[#lines + 1] = { "Base damage (tooltip)", base }
+    lines[#lines + 1] = { "Damage (tooltip)", base }
+    if (c.inTip or 0) > 0 then
+        lines[#lines + 1] = ("The tooltip already has your %s spell power in it, so %s is taken out first."):format(
+            f(c.inTip), f(c.inTip * c.directC, 1))
+    end
     local src = c.coefSource or {}
     local function tag(s) return s == "test" and " (your Forever test)" or " (old Classic rule)" end
     if c.sp > 0 and c.directC > 0 then

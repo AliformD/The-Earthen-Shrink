@@ -55,9 +55,9 @@ end
 ---------------------------------------------------------------------------
 
 local DEFAULTS = {
-    -- Set to true if your spell tooltips already include your spell power.
-    -- (We don't know yet how Forever shows it. See "/es sptooltip".)
-    tooltipIncludesSpellPower = false,
+    -- True when spell tooltips already include your spell power. Angel saw
+    -- this in Forever (2026-11-12), so it's on. See "/es sptooltip".
+    tooltipIncludesSpellPower = true,
     -- Ranks and levels learned from the class trainer window (real Forever data).
     trainer = {},
     -- Play a sound when Windfury procs. Switch with /es sound.
@@ -130,7 +130,13 @@ end
 
 ns.on("ADDON_LOADED", function(name)
     if name ~= ADDON then return end
-    ns.db()
+    local db = ns.db()
+    -- v0.7.0: Angel saw Forever's tooltips (Lightning Bolt, Flametongue) go
+    -- up with spell power, so switch this on once. /es sptooltip off undoes it.
+    if not db.migratedSpTooltip07 then
+        db.tooltipIncludesSpellPower = true
+        db.migratedSpTooltip07 = true
+    end
     if ns.SpellData then ns.SpellData.Init() end
     ns.say("loaded. Type |cffffd100/es|r to open.")
 end)

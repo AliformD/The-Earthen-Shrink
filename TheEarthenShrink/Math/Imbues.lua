@@ -170,6 +170,10 @@ function M.CalcOne(key, im, p, ctx)
         local best = ns.SpellData.Best("FT", p.level or 1)
         local tested = best and ns.CoefTest and ns.CoefTest.Saved("FT", best.rank).proc
         local coef = tested and tested.coef or set.ftCoef or 0
+        -- Forever's Flametongue tooltip already includes your spell power
+        -- (Angel, 2026-11-12), so take that part out before adding it back.
+        local inTip = (set.tooltipIncludesSpellPower and best and best.spRead or 0) * coef
+        perHit = math.max(0, perHit - inTip)
         local fromSP = sp * coef
         buff.onHit = (perHit + fromSP) * ctx.fireCrit
         L[#L + 1] = { "Fire damage (tooltip)", f(im.min, 1) .. " to " .. f(im.max, 1) }
