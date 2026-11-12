@@ -23,6 +23,7 @@ M.RULES = {
 }
 
 local function totemPulse(spell, rank, p)
+    rank = ns.TalentMods and ns.TalentMods.AdjustRank(rank, p) or rank
     local t = rank.totem
     local avg = (t.min + t.max) / 2
     if spell.totem == "dmg" or spell.totem == "aoe" then
@@ -36,7 +37,7 @@ end
 -- its tooltip couldn't be read). Used to compare with Flametongue Totem.
 function M.SearingDps(p)
     local spell = ns.RANKS_BY_KEY.ST
-    local rank = ns.SpellData.Best("ST", p.level or 1)
+    local rank = ns.SpellData.Best("ST", p.level or 1, p)
     if not (rank and rank.totem and rank.totem.min) then return nil end
     return totemPulse(spell, rank, p) / (rank.totem.interval or M.RULES.searingInterval), rank
 end
@@ -44,6 +45,7 @@ end
 -- Works out one totem rank. Returns a table the Totems tab shows:
 --   { cost, breakEven = "text for the column", verdict = "ok"/"mid"/"bad"/"info", lines = { tooltip math }, sub = "..." }
 function M.Calc(spell, rank, p, refDmg, refHeal)
+    rank = ns.TalentMods and ns.TalentMods.AdjustRank(rank, p) or rank
     local t, R = rank.totem, M.RULES
     local out = { lines = {}, mana = rank.mana }
     local L = out.lines

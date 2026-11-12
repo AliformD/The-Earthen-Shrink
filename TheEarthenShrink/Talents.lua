@@ -105,6 +105,58 @@ function TL.Owned()
     return out
 end
 
+-- Every talent in the trees (points or not) for you or an inspected player:
+-- list of { name, rank, max }. nil if the addon can't read them.
+-- 🔶 The inspect parts are untested in Forever.
+function TL.List(unit)
+    local inspect = unit ~= nil and unit ~= "player"
+    local out = {}
+    if GetNumTalentTabs and GetNumTalents and GetTalentInfo then
+        for tab = 1, (ns.try(GetNumTalentTabs, inspect) or 0) do
+            for i = 1, (ns.try(GetNumTalents, tab, inspect) or 0) do
+                local name, _, _, _, rank, maxRank = ns.try(GetTalentInfo, tab, i, inspect)
+                if name then out[#out + 1] = { name = name, rank = rank or 0, max = maxRank } end
+            end
+        end
+        if #out > 0 then return out end
+    end
+    local config, trees = configAndTrees(inspect and unit or "player")
+    if not config then return nil end
+    for _, tree in ipairs(trees) do
+        for _, node in ipairs(ns.try(C_Traits.GetTreeNodes, tree) or {}) do
+            local n = ns.try(C_Traits.GetNodeInfo, config, node)
+            if type(n) == "table" and type(n.entryIDs) == "table" then
+                for _, entry in ipairs(n.entryIDs) do
+                    local e = ns.try(C_Traits.GetEntryInfo, config, entry)
+                    local def = e and e.definitionID and ns.try(C_Traits.GetDefinitionInfo, e.definitionID)
+                    local name = def and def.spellID and spellName(def.spellID)
+                    if name then
+                        local active = n.activeEntry and n.activeEntry.entryID == entry
+                        out[#out + 1] = { name = name, rank = active and (n.activeRank or n.currentRank or 0) or 0, max = n.maxRanks }
+                    end
+                end
+            end
+        end
+    end
+    if #out == 0 then return nil end
+    return out
+end
+
+-- Points per talent name: { ["Elemental Weapons"] = 2, ... }, or nil if
+-- the addon can't read them. level = the player's level: someone level 10+
+-- showing zero points everywhere most likely means "couldn't read".
+function TL.Points(unit, level)
+    local list = TL.List(unit)
+    if not list then return nil end
+    local map, total = {}, 0
+    for _, t in ipairs(list) do
+        map[t.name] = t.rank or 0
+        total = total + (t.rank or 0)
+    end
+    if total == 0 and unit and unit ~= "player" and (level or 0) >= 10 then return nil end
+    return map
+end
+
 -- The talent's tooltip text, or nil if the addon can't find it.
 function TL.Description(name)
     local _, _, id = viaTraits(name)

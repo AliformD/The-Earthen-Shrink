@@ -203,7 +203,9 @@ function T.TalentTooltip(tt, key)
         tt:AddLine("The addon couldn't read your talents, so set your points here.", 1, 0.5, 0, true)
     end
     tt:AddDoubleLine("The Sim Lab uses", info.points .. " points", 1, 0.82, 0, info.changed and 0.12 or 1, 1, info.changed and 0 or 1)
-    if key == "MD" then
+    if S.TALENT_BY_KEY[key].buff then
+        T.BuffTalentLines(tt, info.name)
+    elseif key == "MD" then
         local per, src = S.MentalDexRatio()
         tt:AddLine(("Each point: 1 Intellect = %s attack power (%s)."):format(ns.fmt(per, 2),
             src == "talent" and "read from the talent's text" or "50% per point, as Angel saw in game"), 0.91, 0.89, 0.78, true)
@@ -215,6 +217,27 @@ function T.TalentTooltip(tt, key)
         tt:AddLine(("🔶 Max %d points is a guess; the game's number is used when the addon can read it."):format(info.max), 0.6, 0.6, 0.6, true)
     end
     W.AddNote(tt, "Tick = you have it. Slider = how many points. Change them to test a different build; \"Real\" goes back to your character's talents.")
+end
+
+-- What a weapon buff talent does, as the addon read it from the game.
+function T.BuffTalentLines(tt, name)
+    local TM = ns.TalentMods
+    local found = false
+    for _, key in ipairs({ "RB", "FT", "FB", "WF", "WFT", "FTT", "ST", "MT", "ES", "FlS", "FrS", "LB", "CL", "LS", "HW", "LHW", "CH", "HST", "MST", "FN" }) do
+        for _, m in ipairs(TM.ModsFor(key)) do
+            if m.talent == name then
+                found = true
+                local spell = ns.RANKS_BY_KEY[key]
+                tt:AddDoubleLine((spell and spell.name or key) .. (m.kind == "cost" and " mana cost" or ""),
+                    ("%s%s%% per point"):format(m.perPoint >= 0 and "+" or "", ns.fmt(m.perPoint, 2)), 0.91, 0.89, 0.78, 1, 1, 1)
+            end
+        end
+    end
+    if found then
+        tt:AddLine("Read from the talent's text in the game. 🔶 Assumes the text shows the total for your points (or 1 point if you have none).", 0.6, 0.6, 0.6, true)
+    else
+        tt:AddLine("The addon couldn't read a % for this talent from the game yet, so changing it does nothing here. /es talents shows what it read.", 1, 0.5, 0, true)
+    end
 end
 
 local function sectionTitle(panel, text, y)
@@ -249,12 +272,12 @@ local function buildSliders(page, top, height)
                 tt:AddLine(st.tip, 1, 0.82, 0, true)
             end or nil,
         })
-        row:SetPoint("TOPLEFT", 10, -26 - (i - 1) * 25)
+        row:SetPoint("TOPLEFT", 10, -24 - (i - 1) * 22)
         page.sliders[st.key] = row
     end
 
     -- Talents: read from your character, change them to test other builds.
-    local y = -26 - #ns.SimMath.STATS * 25 - 4
+    local y = -24 - #ns.SimMath.STATS * 22 - 2
     sectionTitle(panel, "YOUR TALENTS", y)
     local real = W.Button(panel, "Real", 64)
     real:SetHeight(18)
@@ -266,18 +289,18 @@ local function buildSliders(page, top, height)
     real:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine("Back to your real talents", 1, 1, 1)
-        GameTooltip:AddLine("Undo any talent changes you made here, and use the points your character really has.", 1, 0.82, 0, true)
+        GameTooltip:AddLine("Undo any talent changes you made here, and use the points your character really has. Weapon buffs, totems and spells go back to what your own tooltips say.", 1, 0.82, 0, true)
         GameTooltip:Show()
     end)
     real:SetScript("OnLeave", function() GameTooltip:Hide() end)
     page.talentReset = real
     page.talents = {}
     for i, t in ipairs(ns.SimMath.TALENTS) do
-        page.talents[t.key] = buildTalentRow(panel, t.key, y - 16 - (i - 1) * 24)
+        page.talents[t.key] = buildTalentRow(panel, t.key, y - 15 - (i - 1) * 22)
     end
 
     -- How you play and how long a fight lasts.
-    y = y - 16 - #ns.SimMath.TALENTS * 24 - 4
+    y = y - 15 - #ns.SimMath.TALENTS * 22 - 2
     sectionTitle(panel, "HOW YOU PLAY", y)
     page.styleButtons = buildStyleButtons(panel, y - 15)
     page.fight = W.StatSlider(panel, 280, {

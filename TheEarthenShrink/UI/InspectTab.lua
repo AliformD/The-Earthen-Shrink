@@ -25,7 +25,7 @@ function T.Build(page)
     page.note = W.Text(page, "GameFontDisableSmall", nil, "LEFT")
     page.note:SetPoint("BOTTOMLEFT", 0, 4)
     page.note:SetPoint("RIGHT", -320, 0)
-    page.note:SetText("Their stats are estimated from their gear and level.")
+    page.note:SetText("Their stats are estimated from their gear and level. Talents: theirs, not yours.")
 
     page.inspect = W.Button(page, "Inspect target", 150)
     page.inspect:SetPoint("BOTTOMRIGHT", -158, 0)
@@ -60,7 +60,10 @@ function T.Update(page)
 
     local rows = ns.ImbueRows(p, list)
     for _, r in ipairs(ns.ProfileRows(p)) do rows[#rows + 1] = r end
-    rows[#rows + 1] = { header = "Talents and buffs aren't counted for inspected players yet" }
+    if p.talentsUnknown then
+        rows[#rows + 1] = { header = "Couldn't read their talents: counted as none (see the talents row)" }
+    end
+    rows[#rows + 1] = { header = "Group buffs (other totems, food) aren't counted for inspected players yet" }
     page.list:SetRows(rows)
 
     page.message = ns.Chat.Build(p, list)

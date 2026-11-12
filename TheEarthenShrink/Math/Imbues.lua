@@ -39,6 +39,14 @@ local function imbueData(key, rank)
     if not rank then return nil end
     if rank.imbue then return rank.imbue, false end
     local fb = ns.IMBUE_FALLBACK and ns.IMBUE_FALLBACK[key] and ns.IMBUE_FALLBACK[key][rank.rank]
+    if fb and rank.talent and rank.talent.power ~= 1 then
+        -- Built-in numbers were seen on Angel's tooltip, so they get the
+        -- same talent change as a tooltip would.
+        local c = {}
+        for k, v in pairs(fb) do c[k] = v end
+        for _, k in ipairs({ "ap", "min", "max" }) do if c[k] then c[k] = c[k] * rank.talent.power end end
+        return c, true
+    end
     if fb then return fb, true end
     return nil
 end
@@ -46,7 +54,7 @@ end
 -- Windfury Totem in your group: its proc numbers, or nil + why not.
 function M.TotemProc(p)
     if not db().wfTotem then return nil, "off" end
-    local rank = ns.SpellData.Best("WFT", p.level or 1)
+    local rank = ns.SpellData.Best("WFT", p.level or 1, p)
     if not rank then return nil, "Windfury Totem isn't available at this level" end
     if not rank.imbue then return nil, "couldn't read the Windfury Totem tooltip" end
     return { chance = rank.imbue.chance, attacks = rank.imbue.attacks, ap = rank.imbue.ap, name = "Windfury Totem", rank = rank }
@@ -80,7 +88,7 @@ end
 -- Flametongue Totem in your group: fire per hit, or nil + why not.
 function M.FtTotem(p)
     if not db().ftTotem then return nil, "off" end
-    local rank = ns.SpellData.Best("FTT", p.level or 1)
+    local rank = ns.SpellData.Best("FTT", p.level or 1, p)
     if not rank then return nil, "Flametongue Totem isn't available at this level" end
     if not (rank.imbue and rank.imbue.min) then return nil, "couldn't read the Flametongue Totem tooltip" end
     if not (p.weapon and p.weapon.speed) then return nil, "no weapon found" end
@@ -144,7 +152,10 @@ function M.Compare(p)
         ctx.seconds = swings * w.speed
         -- Rockbiter already on the weapon? Its attack power is inside your
         -- stats, so take it out or every buff would get it for free.
-        if p.imbueNow == "RB" then
+        -- We take out YOUR tooltip number (no profile given), because that's
+        -- what the game added to your attack power. An inspected player's
+        -- attack power is worked out from gear, so it has no Rockbiter in it.
+        if p.imbueNow == "RB" and p.source ~= "inspect" then
             local rb = imbueData("RB", ns.SpellData.Best("RB", p.level or 1))
             if rb and rb.ap then ctx.ap = math.max(0, ctx.ap - rb.ap); ctx.removedRB = rb.ap end
         end
@@ -159,7 +170,8 @@ function M.Compare(p)
 
     for _, key in ipairs(M.ORDER) do
         local spell = ns.RANKS_BY_KEY[key]
-        local rank = ns.SpellData.Best(key, p.level or 1)
+        -- With p's talents, not just yours (see Math/TalentMods.lua).
+        local rank = ns.SpellData.Best(key, p.level or 1, p)
         local e = { key = key, name = spell.name, rank = rank }
         local data, fromFallback = imbueData(key, rank)
         if not rank then
@@ -171,6 +183,15 @@ function M.Compare(p)
         else
             e.calc = M.CalcOne(key, data, p, ctx)
             e.calc.fromFallback = fromFallback
+            if rank.talent and #rank.talent.lines > 0 then
+                if math.abs(rank.talent.power - 1) > 1e-9 then
+                    for _, l in ipairs(e.calc.lines) do
+                        if type(l) == "table" and type(l[1]) == "string" then l[1] = l[1]:gsub("%(tooltip%)", "(after talents)") end
+                    end
+                end
+                for i, l in ipairs(rank.talent.lines) do table.insert(e.calc.lines, i, l) end
+                e.calc.talent = rank.talent
+            end
         end
         list[#list + 1] = e
     end

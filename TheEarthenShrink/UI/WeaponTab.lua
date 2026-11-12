@@ -201,6 +201,29 @@ function ns.ProfileRows(p)
             or "|cff1eff00from gear|r · no Mental Quickness")
     end
     add("mana", "Max mana", f(p.mana or 0), "mana")
+    -- Talents: your tooltips already have YOUR talents in them. For someone
+    -- else (or the Sim Lab) the math swaps in their talents.
+    local TM = ns.TalentMods
+    if TM then
+        local text, state = TM.Summary(p)
+        local mine = p.source ~= "inspect" and p.source ~= "sim"
+        rows[#rows + 1] = {
+            icon = "Interface\\Icons\\Spell_Nature_RockBiter", name = "Talents that change buffs and spells",
+            sub = (state == "warn" and "|cffff8000" or "|cff1eff00") .. (mine and "already in your tooltips" or p.source == "inspect" and "their talents" or "Sim Lab talents") .. "|r · " .. text,
+            cols = { "", state == "warn" and "?" or "ok" },
+            colColors = { nil, state == "warn" and W.ORANGE or W.GREEN },
+            tooltip = function(tt)
+                tt:AddLine("Talents that change buffs and spells", 1, 1, 1)
+                tt:AddLine("Talents like Elemental Weapons make Rockbiter (and others) stronger, and the game writes that into YOUR tooltips. So the addon takes your talents out of the tooltip number, then puts in the talents of the character it's working out.", 1, 0.82, 0, true)
+                tt:AddLine(" ")
+                tt:AddLine("Used here: " .. text, 1, 1, 1, true)
+                if p.talentsUnknown then
+                    W.AddNote(tt, "The game didn't give us their talents, so we count none. If they have Elemental Weapons, their real numbers are higher.")
+                end
+                W.AddNote(tt, "🔶 How much each talent does is read from the talent's own text. /es talents prints what the addon read.")
+            end,
+        }
+    end
     return rows
 end
 

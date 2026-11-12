@@ -102,7 +102,8 @@ local function testedCoef(key, rank, part, rule)
     return rule, false
 end
 
-local function best(key, q) return ns.SpellData.Best(key, q.level or 1) end
+-- q's talents, not just yours (see Math/TalentMods.lua)
+local function best(key, q) return ns.SpellData.Best(key, q.level or 1, q) end
 
 ---------------------------------------------------------------------------
 -- The parts of your mix

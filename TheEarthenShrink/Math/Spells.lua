@@ -66,6 +66,7 @@ end
 -- Everything about one spell rank for one character.
 -- Returns nil if the game didn't give us enough to calculate.
 function M.Calc(spell, rank, profile)
+    rank = ns.TalentMods and ns.TalentMods.AdjustRank(rank, profile) or rank
     if not rank or not rank.dmg or not rank.mana or rank.mana <= 0 then return nil end
     local R, d = M.RULES, rank.dmg
     local sp = (profile.sp and profile.sp[spell.school or "Nature"]) or 0
@@ -85,6 +86,7 @@ function M.Calc(spell, rank, profile)
 
     local c = {}
     c.sp, c.directC, c.dotC, c.penalty, c.coefSource = sp, directC, dotC, penalty, src
+    c.rankUsed = rank     -- with this character's talents (Math/TalentMods.lua)
     c.inTip = inTip
     c.avgBase, c.direct, c.dot, c.hit, c.critMult = avgBase, direct, dot, hit, critMult
     c.expected = (direct * critMult + dot) * hit        -- dots don't crit (🔶)
@@ -101,10 +103,14 @@ end
 -- Lines of math for a tooltip. Each entry is { label, value } or a plain string.
 function M.Explain(spell, rank, c)
     local f = ns.fmt
+    rank = c.rankUsed or rank
     local d = rank.dmg
     local lines = {}
+    -- Talents: your tooltip has YOUR talents in it; these lines say what
+    -- the math changed for this character's talents.
+    for _, l in ipairs(rank.talent and rank.talent.lines or {}) do lines[#lines + 1] = l end
     local base = d.min == d.max and f(d.min) or (f(d.min) .. " to " .. f(d.max))
-    lines[#lines + 1] = { "Damage (tooltip)", base }
+    lines[#lines + 1] = { rank.talent and math.abs(rank.talent.power - 1) > 1e-9 and "Damage (after talents)" or "Damage (tooltip)", base }
     if (c.inTip or 0) > 0 then
         lines[#lines + 1] = ("The tooltip already has your %s spell power in it, so %s is taken out first."):format(
             f(c.inTip), f(c.inTip * c.directC, 1))
@@ -161,6 +167,7 @@ end
 M.RULES.healCritBonus = 0.5   -- 🔶 a heal crit heals +50%
 
 function M.CalcHeal(spell, rank, p)
+    rank = ns.TalentMods and ns.TalentMods.AdjustRank(rank, p) or rank
     if not rank or not rank.heal or not rank.mana or rank.mana <= 0 then return nil end
     local R, h = M.RULES, rank.heal
     local cast = math.max(rank.cast or 0, R.gcd)
@@ -188,6 +195,7 @@ end
 M.RULES.shieldCoef = 0.33     -- 🔶 share of spell power per Lightning Shield charge
 
 function M.CalcShield(spell, rank, p)
+    rank = ns.TalentMods and ns.TalentMods.AdjustRank(rank, p) or rank
     if not rank or not rank.shield or not rank.mana or rank.mana <= 0 then return nil end
     local R, sh = M.RULES, rank.shield
     local sp = ns.db().tooltipIncludesSpellPower and 0 or ((p.sp and p.sp.Nature) or 0)
@@ -209,6 +217,7 @@ M.RULES.strikePct = 1.5
 
 -- Stormstrike: one weapon hit. (Its +20% on your next shock or bolt is not added here.)
 function M.CalcStrike(spell, rank, p)
+    rank = ns.TalentMods and ns.TalentMods.AdjustRank(rank, p) or rank
     if not rank or not rank.mana or rank.mana <= 0 then return nil end
     local w = p.weapon
     if not (w and w.min and w.speed) then return nil end

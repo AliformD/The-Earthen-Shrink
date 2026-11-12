@@ -235,6 +235,15 @@ function P.FromGear(unit, info)
         p.estimated.sp = true   -- their total Intellect is an estimate
     end
     p.mentalQuick, p.spFromGear, p.spFromInt = mq, spGear, spInt
+    -- Their talent points, so buffs and spells use THEIR talents and not
+    -- the ones inside your tooltips (Math/TalentMods.lua). If the game
+    -- won't tell us, we count no talents and say so on the Inspect tab.
+    if p.isShaman then
+        p.talentPoints = ns.Talents and ns.Talents.Points(unit, p.level)
+        if not p.talentPoints then p.talentPoints, p.talentsUnknown = {}, true end
+    else
+        p.talentPoints = {}   -- not a Shaman: no Shaman talents
+    end
     p.sp = {}
     for school in pairs(SCHOOL_INDEX) do p.sp[school] = spGear + spInt end
     p.healing = spGear + spInt
