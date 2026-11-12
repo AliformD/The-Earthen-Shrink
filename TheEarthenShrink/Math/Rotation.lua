@@ -28,15 +28,19 @@ local R = {}
 ns.Rotation = R
 
 R.RULES = {
-    -- 🔶 Earth / Frost / Flame Shock share one cooldown. Used only if the
-    -- Earth Shock tooltip doesn't say.
+    -- Earth / Frost / Flame Shock share one 6 sec cooldown (Angel, in game
+    -- 2026-11-12): one shock OR the other every 6 sec, never both.
     shockCooldown = 6,
     -- Stormstrike cooldown if its tooltip doesn't say. Angel saw 6 sec in
     -- game on 2026-11-12 (the hotfix to 8 sec hadn't happened yet).
     strikeCooldown = 6,
-    -- 🔶 Our guess: Lightning Shield charges used up per minute while you
-    -- fight (each time a mob hits you, one charge goes off).
-    shieldChargesPerMin = 4,
+    -- Lightning Shield (Angel, in game 2026-11-12): one cast puts up 3 balls
+    -- (charges). Each time something hits you, one ball strikes it and goes
+    -- away (at most one every few seconds). When all 3 are gone you recast
+    -- it and pay the mana again. 🔶 Our guess: one ball goes off every 15
+    -- sec in a fight, so you recast every 45 sec. It depends on how often
+    -- mobs hit you.
+    shieldSecondsPerCharge = 15,
     -- 🔶 How long your fire totem lasts, if its tooltip doesn't say.
     totemDuration = 55,
     -- Stamina gives no damage, so it can't be measured like the others.
@@ -191,7 +195,7 @@ local function shockParts(q, out)
                 sub = ("every %s sec (the shock cooldown%s)"):format(f(1 / rate, 1), fsEvery and " not used by Flame Shock" or ""),
                 lines = {
                     ("%s per cast (crits and misses counted)"):format(f(esc.expected, 1)),
-                    ("Shock cooldown %s sec%s"):format(f(cd), (esRank.cooldown) and "" or " 🔶"),
+                    ("All shocks share one %s sec cooldown"):format(f(cd)),
                     { "DPS", f(esc.expected * rate, 1) },
                 },
             }
@@ -206,16 +210,18 @@ local function shieldPart(q, out)
     if not (sh and rank.mana) then return end
     local coef, tested = testedCoef("LS", rank, "direct", ns.SpellMath.RULES.shieldCoef)
     local per = withSpellPower(sh.dmg, rank, coef, q.sp and q.sp.Nature) * spellCritMult(q)
-    local perMin = R.RULES.shieldChargesPerMin
-    local castEvery = (sh.charges or 3) / perMin * 60
+    local every = R.RULES.shieldSecondsPerCharge
+    local charges = sh.charges or 3
+    local castEvery = charges * every
     out[#out + 1] = {
         key = "LS", name = "Lightning Shield", kind = "spell", icon = rank.icon,
-        dps = per * perMin / 60, mana = rank.mana / castEvery, usesMana = true, every = castEvery, gcd = true,
-        sub = ("%s charges a minute 🔶 guess"):format(f(perMin)),
+        dps = per / every, mana = rank.mana / castEvery, usesMana = true, every = castEvery, gcd = true,
+        sub = ("%d balls, recast every %s sec 🔶"):format(charges, f(castEvery)),
         lines = {
-            ("%s per charge (spell power share %s%s)"):format(f(per, 1), f(coef, 2), tested and ", your test" or " 🔶"),
-            ("🔶 We guess %s charges go off per minute (mobs hitting you)"):format(f(perMin)),
-            { "DPS", f(per * perMin / 60, 1) },
+            ("One cast: %d balls × %s = %s damage for %s mana"):format(charges, f(per, 1), f(per * charges), f(rank.mana)),
+            ("Spell power share per ball %s%s"):format(f(coef, 2), tested and " (your test)" or " 🔶"),
+            ("🔶 We guess a mob hits you (and pops a ball) every %s sec, so you recast every %s sec."):format(f(every), f(castEvery)),
+            { "DPS", f(per / every, 1) },
         },
     }
 end

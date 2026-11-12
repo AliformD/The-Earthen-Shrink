@@ -17,13 +17,11 @@ S.RULES = {
     manaPerInt = 15,          -- 🔶 1 Intellect = 15 mana
     -- 🔶 Intellect for 1% spell crit: about 59.5 at level 60, less at low level.
     intPerSpellCrit = function(level) return 10 + 49.5 * (level / 60) end,
-    -- Mental Dexterity (Enhancement talent): attack power from Intellect.
-    -- A hotfix was announced to lower it to 100%, but on 2026-11-12 Angel
-    -- said it hasn't happened, so 150% (unverified). If the addon can read
-    -- the talent's text, that number wins.
-    -- 🔶 We assume the 150% is what you get with ALL points in it, and each
-    -- point gives an equal share (3 points: 50% each). Not checked yet.
-    mentalDexApPerInt = 1.5,
+    -- Mental Dexterity (Enhancement talent, 3 points): attack power from
+    -- Intellect. Angel, in game 2026-11-12: 50% / 100% / 150% of Intellect
+    -- for 1 / 2 / 3 points. A coming patch makes it 33% / 66% / 100%; the
+    -- addon spots that from the talent's text (see MentalDexRatio).
+    mentalDexApPerInt = 1.5,     -- with all 3 points
     -- Mental Quickness (Enhancement talent): spell damage and healing equal
     -- to 15% of your Intellect for each point. Angel-reported (in game,
     -- 2026-11-12: 87 Int gave 13 spell power with 1 point). The exact
@@ -119,12 +117,14 @@ end
 function S.MentalDexRatio()
     local info = S.Talent("MD")
     local text = ns.Talents and ns.Talents.Description("Mental Dexterity")
-    local pct = text and text:lower():match("(%d+)%% of your intellect")
+    local pct = text and tonumber(text:lower():match("(%d+)%% of your intellect"))
     if pct then
-        -- 🔶 The text shows your CURRENT points if you have any, so divide by
-        -- them; with none we guess it shows the full talent.
-        local per = (info.real and info.real > 0) and info.real or info.max
-        return tonumber(pct) / 100 / per, "talent"
+        -- The text may show any one rank, so we read which SET of numbers
+        -- it is: 50/100/150 (now) or 33/66/100 (after the patch).
+        if pct == 33 or pct == 66 then return 1 / 3, "talent" end
+        if pct == 50 or pct == 150 then return 0.5, "talent" end
+        if pct == 100 and info.real == 2 then return 0.5, "talent" end
+        if pct == 100 and info.real == 3 then return 1 / 3, "talent" end
     end
     return S.RULES.mentalDexApPerInt / info.max, "rule"
 end

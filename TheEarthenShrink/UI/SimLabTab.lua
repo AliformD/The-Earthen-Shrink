@@ -206,7 +206,7 @@ function T.TalentTooltip(tt, key)
     if key == "MD" then
         local per, src = S.MentalDexRatio()
         tt:AddLine(("Each point: 1 Intellect = %s attack power (%s)."):format(ns.fmt(per, 2),
-            src == "talent" and "from the talent's text" or "🔶 our guess: 150% split over the points"), 0.91, 0.89, 0.78, true)
+            src == "talent" and "read from the talent's text" or "50% per point, as Angel saw in game"), 0.91, 0.89, 0.78, true)
     else
         tt:AddLine(("Each point: spell damage and healing = %s%% of your Intellect (what Angel saw in game, tooltip not checked yet)."):format(
             ns.fmt(S.RULES.mentalQuickSpPerIntPerRank * 100)), 0.91, 0.89, 0.78, true)
