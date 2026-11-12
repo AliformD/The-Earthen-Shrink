@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.9.0"
+ns.VERSION = "0.10.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -62,11 +62,18 @@ local DEFAULTS = {
     trainer = {},
     -- Play a sound when Windfury procs. Switch with /es sound.
     windfurySound = true,
-    -- Sim Lab: count Intellect as attack power (Mental Dexterity talent).
+    -- Sim Lab (v0.9 and older): Mental Dexterity tick and Mental Quickness
+    -- points. Only read once, to carry them over into simTalents.
     simMentalDex = false,
-    -- Sim Lab: points in Mental Quickness (Intellect gives spell power).
-    -- nil = read it from your talents if the game lets us.
     simMentalQuick = nil,
+    -- Sim Lab talents you changed: simTalents.MD = { points = 2, off = true }.
+    -- Empty = use the talents your character really has.
+    simTalents = {},
+    -- Sim Lab: how you play ("enh", "ele" or "resto"), fight length in
+    -- seconds, and whether Flame Shock is part of your mix.
+    simStyle = "enh",
+    simFight = 60,
+    simUseFlameShock = true,
 
     -- Weapon buff comparison settings (change them on the Weapon Buffs tab).
     -- Is a Shaman putting down Windfury Totem in your group?
@@ -101,8 +108,8 @@ local DEFAULTS = {
     -- Spells and Healing tabs: which spells are folded up, like
     -- collapsed.spells.LB = true.
     collapsed = {},
-    -- Sim Lab: which view is open ("spells", "weapon", "worth", "stats").
-    simView = "spells",
+    -- Sim Lab: which view is open ("total", "weights", "spells", "weapon", "stats").
+    simView = "total",
 }
 
 function ns.db()

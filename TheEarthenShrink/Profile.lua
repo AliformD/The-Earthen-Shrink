@@ -59,6 +59,9 @@ function P.ReadItemLines(lines, into)
         if n and PRIMARY[stat] then add(PRIMARY[stat], n) end
         add("sp", low:match("spell power by (%d+)") or low:match("^%+(%d+) spell power")
             or low:match("magical spells and effects by up to (%d+)") or low:match("spell damage by up to (%d+)"))
+        -- Healing-only lines ("Increases healing done by spells and effects by up to 22.")
+        add("heal", low:match("healing done by spells and effects by up to (%d+)") or low:match("^%+(%d+) healing")
+            or low:match("increases healing done by up to (%d+)"))
         add("ap", low:match("attack power by (%d+)") or low:match("^%+(%d+) attack power"))
         add("crit", low:match("critical strike by (%d+)%%"))
         add("hit", low:match("chance to hit by (%d+)%%"))
@@ -143,6 +146,7 @@ function P.Player()
         p.sp[school] = ns.clean(ns.try(GetSpellBonusDamage, i)) or 0
     end
     p.healing = ns.clean(ns.try(GetSpellBonusHealing)) or 0
+    p.healingNow = p.healing   -- stays the same in Sim Lab copies (what tooltips include)
     -- Forever uses one crit chance and one hit chance for everything.
     p.spellCrit = ns.clean(ns.try(GetSpellCritChance, SCHOOL_INDEX.Nature)) or 0
     p.meleeCrit = ns.clean(ns.try(GetCritChance)) or p.spellCrit

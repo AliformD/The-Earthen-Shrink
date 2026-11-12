@@ -255,6 +255,8 @@ local function readRank(spell, id, rank, guessLevel)
     -- needs to know how much is already inside the numbers.
     local idx = ns.Profile and ns.Profile.SCHOOL_INDEX[spell.school or (spell.key:match("^FT") and "Fire") or "Nature"]
     rec.spRead = idx and ns.clean(ns.try(GetSpellBonusDamage, idx)) or nil
+    -- Same for heals: the healing bonus already inside the tooltip number.
+    rec.healRead = ns.clean(ns.try(GetSpellBonusHealing)) or nil
     rec.icon = type(info) == "table" and ns.clean(info.iconID) or nil
 
     local lines = tooltipLines(id)

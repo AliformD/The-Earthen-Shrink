@@ -423,17 +423,28 @@ end
 -- Stat slider: a label, the amount you added, and a slider with - and +
 ---------------------------------------------------------------------------
 -- opts = { label, min, max, step, unit = "%" or nil, onChange = fn(value) }
+-- Optional: compact = true (everything on one line, 22 tall), labelInset =
+-- space left of the label (for a tick box), labelWidth, format = fn(v)
+-- returning the value text, valueWidth.
 -- The slider starts at 0 (= your real stats). Left of the middle line takes
 -- stats away, right adds them. The coloured bar shows how far from 0 you are.
 
 function W.StatSlider(parent, width, opts)
     local row = CreateFrame("Frame", nil, parent)
-    row:SetSize(width, 36)
-    row.label = W.Text(row, "GameFontNormal", nil, "LEFT")
-    row.label:SetPoint("TOPLEFT", 2, -1)
+    local compact = opts.compact
+    row:SetSize(width, compact and 22 or 36)
+    row.label = W.OneLine(W.Text(row, compact and "GameFontNormalSmall" or "GameFontNormal", nil, "LEFT"))
     row.label:SetText(opts.label)
-    row.value = W.Text(row, "GameFontHighlight", nil, "RIGHT")
-    row.value:SetPoint("TOPRIGHT", -2, -1)
+    row.value = W.OneLine(W.Text(row, compact and "GameFontHighlightSmall" or "GameFontHighlight", nil, "RIGHT"))
+    if compact then
+        row.label:SetPoint("LEFT", opts.labelInset or 0, 0)
+        row.label:SetWidth(opts.labelWidth or 78)
+        row.value:SetPoint("RIGHT", 0, 0)
+        row.value:SetWidth(opts.valueWidth or 40)
+    else
+        row.label:SetPoint("TOPLEFT", 2, -1)
+        row.value:SetPoint("TOPRIGHT", -2, -1)
+    end
 
     local function stepButton(text)
         local b = W.Create("Button", nil, row, { "UIPanelButtonTemplate" })
@@ -442,9 +453,14 @@ function W.StatSlider(parent, width, opts)
         return b
     end
     row.minus = stepButton("-")
-    row.minus:SetPoint("BOTTOMLEFT", 0, 0)
     row.plus = stepButton("+")
-    row.plus:SetPoint("BOTTOMRIGHT", 0, 0)
+    if compact then
+        row.minus:SetPoint("LEFT", row.label, "RIGHT", 2, 0)
+        row.plus:SetPoint("RIGHT", row.value, "LEFT", -2, 0)
+    else
+        row.minus:SetPoint("BOTTOMLEFT", 0, 0)
+        row.plus:SetPoint("BOTTOMRIGHT", 0, 0)
+    end
 
     local s = CreateFrame("Slider", nil, row)
     s:SetOrientation("HORIZONTAL")
@@ -484,7 +500,9 @@ function W.StatSlider(parent, width, opts)
 
     local function show(v)
         local unit = opts.unit or ""
-        if v > 0 then
+        if opts.format then
+            row.value:SetText(opts.format(v))
+        elseif v > 0 then
             row.value:SetText("|cff1eff00+" .. ns.fmt(v) .. unit .. "|r")
         elseif v < 0 then
             row.value:SetText("|cffff4a3a" .. ns.fmt(v) .. unit .. "|r")
@@ -515,6 +533,16 @@ function W.StatSlider(parent, width, opts)
     s:SetScript("OnMouseWheel", function(_, delta) row:Set(row:Get() + delta * (opts.step or 1), true) end)
     row.minus:SetScript("OnClick", function() row:Set(row:Get() - (opts.step or 1), true) end)
     row.plus:SetScript("OnClick", function() row:Set(row:Get() + (opts.step or 1), true) end)
+
+    -- Change the range (like a talent whose max points we learn later).
+    function row:SetRange(lo, hi)
+        if lo == opts.min and hi == opts.max then return end
+        opts.min, opts.max = lo, hi
+        quiet = true
+        s:SetMinMaxValues(lo, hi)
+        quiet = false
+        show(row:Get())
+    end
 
     function row:Get()
         local step = opts.step or 1

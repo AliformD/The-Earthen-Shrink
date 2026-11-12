@@ -13,9 +13,13 @@
 -- sliders are set to the difference.
 --
 -- Layout (simple on purpose):
---   Left:  "1. Change stats": the sliders and your talents.
---   Right: "2. See what changes": four buttons pick ONE view at a time:
---          Spells, Weapon buff, Stat value, My stats.
+--   Left:  the stat sliders, your talents (tick + points), and how you play
+--          (Melee / Caster / Healer, fight length).
+--   Right: five buttons pick ONE view at a time:
+--          Total   = everything you do in a fight added up, now vs. with
+--                    your changes (the number to compare gear with)
+--          Weights = one weight per stat, plus copy-ready text for Pawn
+--          Spells, Buffs (weapon buff), Stats.
 
 local _, ns = ...
 local W = ns.Widgets
@@ -120,15 +124,113 @@ local function buildItemBox(page, width)
     end)
 end
 
+-- A small "Melee / Caster / Healer" style picker: three buttons, the one
+-- you picked stays lit.
+local function buildStyleButtons(panel, y)
+    local btns = {}
+    local bw = (280 - 2 * 4) / #ns.Rotation.STYLES
+    for i, st in ipairs(ns.Rotation.STYLES) do
+        local b = W.Button(panel, st.short, bw)
+        b:SetHeight(20)
+        b:SetPoint("TOPLEFT", 10 + (i - 1) * (bw + 4), y)
+        b:SetScript("OnClick", function()
+            ns.db().simStyle = st.id
+            T.Update(T.page)
+        end)
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(st.name, 1, 1, 1)
+            local what = {
+                enh = "Your mix: weapon swings, weapon buff, Stormstrike, shocks, Lightning Shield and Searing Totem. Stat weights are counted in Strength (1 Strength = 1.00).",
+                ele = "Your mix: shocks, Lightning Shield, Searing Totem, and Lightning Bolt in all the time left. Stat weights are counted in Spell Power (1 Spell Power = 1.00).",
+                resto = "Your mix: Healing Wave over and over. Stat weights are counted in Healing (1 Healing = 1.00).",
+            }
+            GameTooltip:AddLine(what[st.id], 1, 0.82, 0, true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        btns[st.id] = b
+    end
+    return btns
+end
+
+-- One talent: a tick box ("I have it"), a points slider, and "2/3".
+local function buildTalentRow(panel, key, y)
+    local S = ns.SimMath
+    local def = S.TALENT_BY_KEY[key]
+    local row
+    row = W.StatSlider(panel, 280, {
+        label = def.name, min = 0, max = def.maxFallback, step = 1, compact = true,
+        labelInset = 22, labelWidth = 118, valueWidth = 34,
+        format = function(v)
+            local info = S.Talent(key)
+            local col = info.on and "|cff1eff00" or "|cff999999"
+            return col .. ns.fmt(v) .. "/" .. info.max .. "|r"
+        end,
+        onChange = function(v)
+            S.SetTalentPoints(key, v)
+            T.Update(T.page)
+        end,
+        tooltip = function(tt) T.TalentTooltip(tt, key) end,
+    })
+    row:SetPoint("TOPLEFT", 10, y)
+    local cb = W.Create("CheckButton", nil, row, { "UICheckButtonTemplate", "ChatConfigCheckButtonTemplate" })
+    cb:SetSize(20, 20)
+    cb:SetPoint("LEFT", -2, 0)
+    cb:SetScript("OnClick", function(self)
+        S.SetTalentOn(key, self:GetChecked() and true or false)
+        T.Update(T.page)
+    end)
+    cb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        T.TalentTooltip(GameTooltip, key)
+        GameTooltip:Show()
+    end)
+    cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row.check = cb
+    return row
+end
+
+function T.TalentTooltip(tt, key)
+    local S = ns.SimMath
+    local info = S.Talent(key)
+    tt:AddLine(info.name, 1, 1, 1)
+    tt:AddLine(info.what, 1, 0.82, 0, true)
+    tt:AddLine(" ")
+    if info.real ~= nil then
+        tt:AddDoubleLine("Your character has", info.real .. "/" .. info.max .. " points", 1, 0.82, 0, 1, 1, 1)
+    else
+        tt:AddLine("The addon couldn't read your talents, so set your points here.", 1, 0.5, 0, true)
+    end
+    tt:AddDoubleLine("The Sim Lab uses", info.points .. " points", 1, 0.82, 0, info.changed and 0.12 or 1, 1, info.changed and 0 or 1)
+    if key == "MD" then
+        local per, src = S.MentalDexRatio()
+        tt:AddLine(("Each point: 1 Intellect = %s attack power (%s)."):format(ns.fmt(per, 2),
+            src == "talent" and "read from the talent's text" or "50% per point, as Angel saw in game"), 0.91, 0.89, 0.78, true)
+    else
+        tt:AddLine(("Each point: spell damage and healing = %s%% of your Intellect (what Angel saw in game, tooltip not checked yet)."):format(
+            ns.fmt(S.RULES.mentalQuickSpPerIntPerRank * 100)), 0.91, 0.89, 0.78, true)
+    end
+    if not info.maxFromGame then
+        tt:AddLine(("🔶 Max %d points is a guess; the game's number is used when the addon can read it."):format(info.max), 0.6, 0.6, 0.6, true)
+    end
+    W.AddNote(tt, "Tick = you have it. Slider = how many points. Change them to test a different build; \"Real\" goes back to your character's talents.")
+end
+
+local function sectionTitle(panel, text, y)
+    local t = W.Text(panel, "GameFontNormalSmall", nil, "LEFT")
+    t:SetPoint("TOPLEFT", 10, y)
+    t:SetText(text)
+    t:SetTextColor(0.6, 0.6, 0.6)
+    return t
+end
+
 local function buildSliders(page, top, height)
     local panel = W.Panel(page)
     panel:SetSize(300, height)
     panel:SetPoint("TOPLEFT", 0, top)
 
-    local title = W.Text(panel, "GameFontNormalSmall", nil, "LEFT")
-    title:SetPoint("TOPLEFT", 10, -7)
-    title:SetText("1. CHANGE YOUR STATS")
-    title:SetTextColor(0.6, 0.6, 0.6)
+    sectionTitle(panel, "1. CHANGE YOUR STATS", -7)
     local reset = W.Button(panel, "Reset", 64)
     reset:SetHeight(18)
     reset:SetPoint("TOPRIGHT", -6, -4)
@@ -137,69 +239,70 @@ local function buildSliders(page, top, height)
     page.sliders = {}
     for i, st in ipairs(ns.SimMath.STATS) do
         local row = W.StatSlider(panel, 280, {
-            label = st.label, min = st.min, max = st.max, step = st.step, unit = st.unit,
+            label = st.label, min = st.min, max = st.max, step = st.step, unit = st.unit, compact = true,
             onChange = function(v)
                 T.add[st.key] = v
                 T.Update(page)
             end,
         })
-        row:SetPoint("TOPLEFT", 10, -26 - (i - 1) * 38)
+        row:SetPoint("TOPLEFT", 10, -26 - (i - 1) * 25)
         page.sliders[st.key] = row
     end
 
-    -- Mental Dexterity: we can't read talents yet, so you tick it yourself.
-    local cb = W.Create("CheckButton", nil, panel, { "UICheckButtonTemplate", "ChatConfigCheckButtonTemplate" })
-    cb:SetSize(20, 20)
-    cb:SetPoint("BOTTOMLEFT", 6, 21)
-    local label = W.Text(panel, "GameFontHighlightSmall", nil, "LEFT")
-    label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
-    label:SetText("Mental Dexterity (Intellect gives attack power)")
-    label:SetPoint("RIGHT", -6, 0)
-    W.OneLine(label)
-    cb:SetScript("OnClick", function(self)
-        ns.db().simMentalDex = self:GetChecked() and true or false
+    -- Talents: read from your character, change them to test other builds.
+    local y = -26 - #ns.SimMath.STATS * 25 - 4
+    sectionTitle(panel, "YOUR TALENTS", y)
+    local real = W.Button(panel, "Real", 64)
+    real:SetHeight(18)
+    real:SetPoint("TOPRIGHT", -6, y + 3)
+    real:SetScript("OnClick", function()
+        ns.SimMath.ResetTalents()
         T.Update(page)
     end)
-    page.mentalDex = cb
-
-    -- Mental Quickness: Intellect gives spell power. Click to set your
-    -- points yourself; right-click to go back to reading your talents.
-    local mq = W.Create("Button", nil, panel, { "UIPanelButtonTemplate" })
-    mq:SetSize(288, 18)
-    mq:SetPoint("BOTTOMLEFT", 6, 3)
-    mq:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    mq:SetScript("OnClick", function(_, mouse)
-        local S, db = ns.SimMath, ns.db()
-        if mouse == "RightButton" then
-            db.simMentalQuick = nil
-        else
-            local r = S.MentalQuickRank()
-            db.simMentalQuick = (r + 1) % (S.RULES.mentalQuickMaxRank + 1)
-        end
-        T.Update(page)
-    end)
-    mq:SetScript("OnEnter", function(self)
+    real:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Mental Quickness", 1, 1, 1)
-        GameTooltip:AddLine(("Each point: spell damage and healing = %s%% of your Intellect."):format(
-            ns.fmt(ns.SimMath.RULES.mentalQuickSpPerIntPerRank * 100)), 1, 0.82, 0, true)
-        GameTooltip:AddLine("Click to change your points. Right-click to let the addon read your talents.", 0.6, 0.6, 0.6, true)
-        GameTooltip:AddLine("15% per point is what Angel saw in game. The tooltip text isn't checked yet.", 0.6, 0.6, 0.6, true)
+        GameTooltip:AddLine("Back to your real talents", 1, 1, 1)
+        GameTooltip:AddLine("Undo any talent changes you made here, and use the points your character really has.", 1, 0.82, 0, true)
         GameTooltip:Show()
     end)
-    mq:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    page.mentalQuick = mq
+    real:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    page.talentReset = real
+    page.talents = {}
+    for i, t in ipairs(ns.SimMath.TALENTS) do
+        page.talents[t.key] = buildTalentRow(panel, t.key, y - 16 - (i - 1) * 24)
+    end
+
+    -- How you play and how long a fight lasts.
+    y = y - 16 - #ns.SimMath.TALENTS * 24 - 4
+    sectionTitle(panel, "HOW YOU PLAY", y)
+    page.styleButtons = buildStyleButtons(panel, y - 15)
+    page.fight = W.StatSlider(panel, 280, {
+        label = "Fight length", min = 15, max = 300, step = 15, compact = true, valueWidth = 50,
+        format = function(v) return ns.fmt(v) .. " sec" end,
+        onChange = function(v)
+            ns.db().simFight = v
+            T.Update(page)
+        end,
+        tooltip = function(tt)
+            tt:AddLine("Fight length", 1, 1, 1)
+            tt:AddLine("How long one fight lasts. In a long fight your mana can run out, so Intellect (more mana) is worth more.", 1, 0.82, 0, true)
+            W.AddNote(tt, "🔶 Mana you get back during the fight (Spirit, Mana Spring) isn't counted yet.")
+        end,
+    })
+    page.fight:SetPoint("TOPLEFT", 10, y - 39)
 end
 
--- The four views on the right. cols = the column titles for that view.
+-- The views on the right. cols = the column titles for that view.
 local VIEWS = {
-    { id = "spells", label = "Spells",      title = "Your spells (highest rank)",  cols = { "Now", "Try", "Change" },
+    { id = "total",  label = "Total",   title = "Your total",                  cols = { "Now", "Try", "Change" },
+      note = "Everything you do in a fight, added up. Hover a row for the math." },
+    { id = "weights", label = "Weights", title = "Stat weights",               cols = { "", "Per point", "Weight" },
+      note = "How much 1 point of each stat adds to your total. Copy them at the bottom." },
+    { id = "spells", label = "Spells",  title = "Your spells (highest rank)",  cols = { "Now", "Try", "Change" },
       note = "Try = with your changes. Hover a row for the math." },
-    { id = "weapon", label = "Weapon buff", title = "Best weapon buff (DPS added)", cols = { "Now", "Try", "Change" },
+    { id = "weapon", label = "Buffs",   title = "Best weapon buff (DPS added)", cols = { "Now", "Try", "Change" },
       note = "Move Spell Power or Attack Power to see when the best buff changes." },
-    { id = "worth",  label = "Stat value",  title = "What 1 point is worth",       cols = { "", "DPS", "Same as" },
-      note = "Uses your SP Test results. Bigger DPS = that stat helps more." },
-    { id = "stats",  label = "My stats",    title = "Your stats",                  cols = { "Now", "Try", "Change" },
+    { id = "stats",  label = "Stats",   title = "Your stats",                  cols = { "Now", "Try", "Change" },
       note = "Now = from the game. Try = with your changes." },
 }
 local VIEW_BY_ID = {}
@@ -207,7 +310,7 @@ for _, v in ipairs(VIEWS) do VIEW_BY_ID[v.id] = v end
 
 function T.View()
     local id = ns.db().simView
-    return VIEW_BY_ID[id] and id or "spells"
+    return VIEW_BY_ID[id] and id or "total"
 end
 
 function T.SetView(id)
@@ -226,7 +329,7 @@ function T.Build(page)
     -- "2. See what changes": one button per view.
     local x, right = 308, width - 308
     page.viewButtons = {}
-    local bw = (right - 3 * 4) / #VIEWS
+    local bw = (right - (#VIEWS - 1) * 4) / #VIEWS
     for i, v in ipairs(VIEWS) do
         local b = W.Button(page, v.label, bw)
         b:SetPoint("TOPLEFT", x + (i - 1) * (bw + 4), -58)
@@ -626,67 +729,326 @@ local function weaponRows(p, q, why, opts)
 end
 
 ---------------------------------------------------------------------------
--- View: Stat value (what 1 point is worth)
+-- View: Total (everything you do in a fight, added up)
 ---------------------------------------------------------------------------
 
-local function worthRows(p, mqRank)
-    local db = ns.db()
-    local rows = { { header = "1 spell power is worth (your SP Tests)" } }
-    local strDps = ns.CoefTest.StrengthDps(p)
-    local weights = ns.CoefTest.Weights(p)
-    for _, w in ipairs(weights) do
-        local t = w.t
+local RED = { 1, 0.29, 0.23 }
+
+-- "+0.4" / "-1.2" with a colour, for small numbers where % would mislead.
+local function diff(now, try, decimals)
+    if not now or not try then return "", nil end
+    local d = try - now
+    if math.abs(d) < 0.05 then return "-", W.GREY end
+    return (d > 0 and "+" or "") .. f(d, decimals or 1), d > 0 and W.GREEN or RED
+end
+
+local function totalRows(p, q, why, opts)
+    local Ro = ns.Rotation
+    local style = Ro.Style()
+    local a, b = Ro.Total(p, { style = style }), Ro.Total(q, { style = style })
+    local unit = style.unit
+    local rows = {}
+    rows[#rows + 1] = { header = ("%s · %s sec fight"):format(style.name, f(b.fight)) }
+
+    -- The answer first: one number for everything.
+    local ch, chCol = change(a.total, b.total, 1)
+    -- Melee vs spells, so you can see "weaker swings, stronger spells".
+    local groups = {}
+    local function addTo(res, slot)
+        for _, part in ipairs(res.parts) do
+            local g = part.kind == "melee" and "Melee" or part.kind == "heal" and "Healing" or "Spells"
+            groups[g] = groups[g] or { 0, 0 }
+            groups[g][slot] = groups[g][slot] + part.dps
+        end
+    end
+    addTo(a, 1); addTo(b, 2)
+    local bits = {}
+    for _, g in ipairs({ "Melee", "Spells", "Healing" }) do
+        local v = groups[g]
+        if v then
+            local d = v[2] - v[1]
+            local col = math.abs(d) < 0.05 and "|cff999999" or (d > 0 and "|cff1eff00" or "|cffff4a3a")
+            bits[#bits + 1] = ("%s %s%s|r"):format(g, col, math.abs(d) < 0.05 and "same" or ((d > 0 and "+" or "") .. f(d, 1)))
+        end
+    end
+    rows[#rows + 1] = {
+        icon = "Interface\\Icons\\Spell_Nature_Lightning", badge = b.total > a.total + 0.05,
+        name = (unit == "HPS" and "Healing" or "Damage") .. " per second, all together",
+        nameColor = W.WHITE, sub = table.concat(bits, " · "),
+        cols = { f(a.total, 1), f(b.total, 1), ch }, colColors = { W.GREY, W.WHITE, chCol },
+        tooltip = function(tt)
+            tt:AddLine("Your total " .. unit, 1, 1, 1)
+            tt:AddLine("Every part of your mix below, added up. This is the number to look at when you compare gear: if it goes up, the item is better for you, even if one part (like your swings) goes down.", 1, 0.82, 0, true)
+            tt:AddLine(" ")
+            tt:AddDoubleLine("Now", f(a.total, 1) .. " " .. unit, 1, 0.82, 0, 1, 1, 1)
+            tt:AddDoubleLine("With your changes", f(b.total, 1) .. " " .. unit, 1, 0.82, 0, 0.12, 1, 0)
+            for g, v in pairs(groups) do
+                tt:AddDoubleLine("  " .. g, f(v[1], 1) .. " -> " .. f(v[2], 1), 0.91, 0.89, 0.78, 1, 1, 1)
+            end
+            addWhy(tt, why)
+        end,
+    }
+
+    -- Each part of the mix.
+    rows[#rows + 1] = { header = "Where it comes from" }
+    local byKey = {}
+    for _, part in ipairs(a.parts) do byKey[part.key] = part end
+    for _, part in ipairs(b.parts) do
+        local old = byKey[part.key]
+        local dch, dcol = diff(old and old.dps, part.dps, 1)
+        local share = b.total > 0 and part.dps / b.total * 100 or 0
         rows[#rows + 1] = {
-            icon = t.rank.icon, name = t.spell.name,
-            sub = ("%s · %s per use · every %s sec"):format(ns.CoefTest.PART_NAMES[t.part] or t.part, f(w.saved.total, 2), f(t.every, 1)),
-            cols = { "", f(w.dps, 3), w.strEq and (f(w.strEq, 2) .. " Str") or "?" },
-            colColors = { W.GREY, W.WHITE, W.GREEN },
+            icon = part.icon, name = part.name,
+            sub = (part.sub or (part.kind == "melee" and "melee" or "spell")) .. (" · %s%% of your total"):format(f(share)),
+            cols = { old and f(old.dps, 1) or "-", f(part.dps, 1), dch }, colColors = { W.GREY, W.WHITE, dcol },
             tooltip = function(tt)
-                tt:AddDoubleLine(t.spell.name, "Rank " .. t.rank.rank, 1, 1, 1, 0.6, 0.6, 0.6)
-                W.AddMath(tt, {
-                    { "Your SP Test", f(w.saved.total, 3) .. " ± " .. f(w.saved.totalMargin, 3) },
-                    ("1 spell power = %s more damage each use"):format(f(w.saved.total, 3)),
-                    ("÷ %s sec between uses = %s DPS"):format(f(t.every, 1), f(w.dps, 3)),
-                    strDps and ("1 Strength = %s melee DPS"):format(f(strDps, 3)) or "Couldn't read your weapon for Strength.",
-                    w.strEq and ("So 1 spell power ≈ %s Strength for this"):format(f(w.strEq, 2)) or "",
-                })
-                W.AddNote(tt, "Only counts this one spell or buff. If you use several, add their numbers up. Time between uses, misses and crits are old Classic rules, not tested in Forever.")
+                tt:AddLine(part.name, 1, 1, 1)
+                W.AddMath(tt, part.lines)
+                if part.usesMana and b.manaFactor < 1 then
+                    tt:AddLine(("Mana runs out: only %s%% of this fits in the fight."):format(f(b.manaFactor * 100)), 1, 0.5, 0, true)
+                end
+                addWhy(tt, why)
+                W.AddNote(tt, "Spell numbers come from your tooltips. How often each is used, misses and crits are old Classic rules (🔶) until tested in Forever.")
             end,
         }
     end
-    if #weights == 0 then
-        rows[#rows + 1] = { icon = "Interface\\Icons\\Trade_Alchemy", name = "No saved tests yet",
-            sub = "Save a result on the SP Test tab", cols = { "", "", "" } }
+    if #b.parts == 0 then
+        rows[#rows + 1] = { icon = 134400, name = "Nothing to add up yet", sub = "The addon couldn't read your weapon or spells.", cols = { "", "", "" } }
     end
-    -- 1 Intellect: spell power (Mental Quickness) + attack power (Mental Dexterity).
-    local int = ns.CoefTest.IntellectValue(p, { mentalDex = db.simMentalDex, mentalQuick = mqRank }, weights)
-    rows[#rows + 1] = { header = "Compare with" }
-    if int then
+
+    -- Mana for the whole fight.
+    local short = b.manaFactor < 1
+    rows[#rows + 1] = { header = "Mana" }
+    rows[#rows + 1] = {
+        icon = "Interface\\Icons\\Spell_Shadow_ManaBurn", name = short and "You run out of mana" or "Enough mana for the fight",
+        nameColor = short and { 1, 0.5, 0 } or W.GREEN,
+        sub = ("needs %s, you have %s"):format(f(b.manaNeed), f(b.manaHave)),
+        cols = { f(a.manaFactor * 100) .. "%", f(b.manaFactor * 100) .. "%", "" }, colColors = { W.GREY, W.WHITE, W.GREY },
+        tooltip = function(tt)
+            tt:AddLine("Mana for one fight", 1, 1, 1)
+            tt:AddLine("The % is how much of your spell casting your mana bar pays for. Under 100% means spells get cut down, and more Intellect (mana) helps.", 1, 0.82, 0, true)
+            tt:AddLine(" ")
+            tt:AddDoubleLine("Mana needed", f(b.manaNeed), 1, 0.82, 0, 1, 1, 1)
+            tt:AddDoubleLine("Your mana bar", f(b.manaHave), 1, 0.82, 0, 1, 1, 1)
+            W.AddNote(tt, "🔶 Mana you get back during the fight (Spirit, Mana Spring) isn't counted yet. Change the fight length on the left.")
+        end,
+    }
+
+    -- What's in the mix.
+    if style.id ~= "resto" then
+        local on = ns.db().simUseFlameShock ~= false
+        rows[#rows + 1] = { header = "Your mix (click to change)" }
         rows[#rows + 1] = {
-            icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", name = "1 Intellect (compare)",
-            sub = ("%s spell power + %s attack power"):format(f(int.sp, 2), f(int.ap, 1)),
-            cols = { "", f(int.dps, 3), int.strEq and (f(int.strEq, 2) .. " Str") or "?" },
-            colColors = { W.GREY, W.WHITE, W.GREEN },
+            icon = "Interface\\Icons\\Spell_Fire_FlameShock", name = "Flame Shock: " .. (on and "on" or "off"),
+            nameColor = on and W.GREEN or W.GREY,
+            sub = on and "cast once, then again when it runs out" or "only Earth Shock",
+            cols = { "", "", "" },
+            onClick = function()
+                ns.db().simUseFlameShock = not on
+                T.Update(T.page)
+            end,
             tooltip = function(tt)
-                tt:AddLine("1 Intellect", 1, 1, 1)
-                W.AddMath(tt, {
-                    ("Mental Quickness %d × %s%% = %s spell power"):format(mqRank, f(ns.SimMath.RULES.mentalQuickSpPerIntPerRank * 100), f(int.sp, 2)),
-                    int.best and ("× %s DPS per spell power (%s, your best saved test) = %s DPS"):format(f(int.best.dps, 3), int.best.t.spell.name, f(int.spDps, 3))
-                        or "No saved SP Test yet, so spell power counts as 0 here.",
-                    db.simMentalDex and ("Mental Dexterity: +%s attack power = %s melee DPS"):format(f(int.ap, 1), f(int.apDps, 3))
-                        or "Mental Dexterity not ticked: no attack power.",
-                    { "Total", f(int.dps, 3) .. " DPS" },
-                })
-                W.AddNote(tt, "Intellect also gives mana and spell crit; those aren't in this number. 15% per point is Angel-reported, the tooltip isn't checked yet.")
+                tt:AddLine("Flame Shock in your mix", 1, 1, 1)
+                tt:AddLine("On: Flame Shock goes out once and again when it runs out; the other shock casts are Earth Shock. Off: only Earth Shock. Click to switch.", 1, 0.82, 0, true)
             end,
         }
-    end
-    if strDps then
-        rows[#rows + 1] = { icon = "Interface\\Icons\\Ability_Warrior_BattleShout", name = "1 Strength (compare)",
-            sub = "Melee swing DPS from +2 attack power", cols = { "", f(strDps, 3), "1 Str" },
-            colColors = { W.GREY, W.WHITE, W.GREY } }
     end
     return rows
+end
+
+---------------------------------------------------------------------------
+-- View: Stat weights
+---------------------------------------------------------------------------
+
+local BASE_LABEL = { str = "Strength", sp = "Spell Power", heal = "Healing" }
+
+-- Short "where it comes from" text: the biggest parts.
+local function topParts(byPart)
+    local list = {}
+    for _, x in ipairs(byPart or {}) do if x.gain > 0 then list[#list + 1] = x end end
+    table.sort(list, function(a, b) return a.gain > b.gain end)
+    local names = {}
+    for i = 1, math.min(3, #list) do names[#names + 1] = list[i].name end
+    return #names > 0 and ("from " .. table.concat(names, ", ")) or "does nothing for your mix"
+end
+
+-- Plain words for what each stat does.
+local WHAT = {
+    str = "Strength gives attack power (🔶 2 per Strength): every melee hit, Stormstrike and Windfury.",
+    agi = "Agility gives melee crit (🔶 20 Agility = 1%). It doesn't help spells.",
+    int = "Intellect does several things at once: more mana, spell crit, spell power (Mental Quickness) and attack power (Mental Dexterity). All of them are in this one number.",
+    sp = "Spell power makes shocks, Lightning Shield, totems, Lightning Bolt and Flametongue fire hit harder.",
+    heal = "Healing makes your heals bigger. Items that say \"damage and healing\" give you this AND Spell Power; Pawn counts both.",
+    ap = "Attack power: every melee hit, Stormstrike and the weapon buffs (🔶 14 attack power = 1 weapon DPS).",
+    crit = "Forever uses one crit chance for melee and spells, so 1% crit helps both. Flametongue's fire uses spell crit.",
+    hit = "Fewer misses for melee and spells (🔶 Classic miss chances).",
+    wdps = "The DPS number on a weapon. Only counts for your main hand.",
+}
+
+local function weightRows(p, q, opts)
+    local Ro = ns.Rotation
+    local w = Ro.Weights(p, T.add, opts)
+    T.lastWeights = w
+    local style = w.style
+    local unit = style.unit
+    local base = BASE_LABEL[style.base]
+    local rows = {}
+    rows[#rows + 1] = { header = ("Counted in %s: 1 %s = 1.00"):format(base, base) }
+    if not (w.unitGain and w.unitGain > 1e-9) then
+        rows[#rows + 1] = { icon = 134400, name = "Can't work out weights yet",
+            sub = ("%s does nothing for your %s mix"):format(base, style.short:lower()), cols = { "", "", "" } }
+    end
+    local list = {}
+    for _, def in ipairs(Ro.WEIGHTS) do
+        local r = w.rows[def.key]
+        if r then list[#list + 1] = { def = def, r = r } end
+    end
+    -- Highest weight first, Stamina (an estimate) last.
+    table.sort(list, function(a, b)
+        if a.r.estimate ~= b.r.estimate then return not a.r.estimate end
+        return (a.r.weight or -1) > (b.r.weight or -1)
+    end)
+    for _, x in ipairs(list) do
+        local def, r = x.def, x.r
+        local weight = r.weight
+        local isBase = def.key == style.base
+        local row = {
+            icon = def.icon, name = def.label,
+            nameColor = isBase and W.WHITE or nil,
+            sub = r.estimate and "no damage; our estimate (hover)" or topParts(r.byPart),
+            cols = { "", r.estimate and "-" or (f(r.gain, 3) .. " " .. unit), weight and f(weight, 2) or "?" },
+            colColors = { W.GREY, W.GREY, r.estimate and W.ORANGE or ((weight or 0) > 0.005 and W.GREEN or W.GREY) },
+            meter = weight and math.max(0, math.min(1, weight)) or 0,
+        }
+        row.tooltip = function(tt)
+            tt:AddDoubleLine(def.label, weight and ("weight " .. f(weight, 2)) or "", 1, 1, 1, 0.12, 1, 0)
+            if r.estimate then
+                tt:AddLine("Stamina gives health (🔶 10 per point), not damage, so the addon can't measure it like the others.", 1, 0.82, 0, true)
+                tt:AddLine(("We set it to %s of %s: low enough that it never beats a damage stat, high enough to pick the tougher item when two items are close. It's our estimate, not game data."):format(
+                    f(Ro.RULES.staminaShare, 2), base), 0.91, 0.89, 0.78, true)
+                return
+            end
+            tt:AddLine(WHAT[def.key] or "", 1, 0.82, 0, true)
+            tt:AddLine(" ")
+            tt:AddDoubleLine(("1 %s%s adds"):format((def.label:gsub(" %(1%%%)", "")), def.percent and "%" or ""),
+                f(r.gain, 3) .. " " .. unit, 1, 0.82, 0, 1, 1, 1)
+            for _, bp in ipairs(r.byPart or {}) do
+                tt:AddDoubleLine("   " .. bp.name, (bp.gain > 0 and "+" or "") .. f(bp.gain, 3), 0.91, 0.89, 0.78, 1, 1, 1)
+            end
+            tt:AddDoubleLine(("1 %s adds"):format(base), f(w.unitGain or 0, 3) .. " " .. unit, 1, 0.82, 0, 1, 1, 1)
+            if weight then
+                tt:AddLine(("%s ÷ %s = %s"):format(f(r.gain, 3), f(w.unitGain, 3), f(weight, 2)), 0.91, 0.89, 0.78, true)
+            end
+            if def.key == "crit" and w.rows.mcrit and w.rows.scrit then
+                tt:AddLine(" ")
+                tt:AddDoubleLine("   melee part", f(w.rows.mcrit.weight or 0, 2), 0.91, 0.89, 0.78, 1, 1, 1)
+                tt:AddDoubleLine("   spell part", f(w.rows.scrit.weight or 0, 2), 0.91, 0.89, 0.78, 1, 1, 1)
+            end
+            if def.key == "int" then
+                local t = ns.SimMath.TalentOpts()
+                tt:AddLine(("With Mental Dexterity %d and Mental Quickness %d (your talents on the left)."):format(t.mentalDex, t.mentalQuick), 0.6, 0.6, 0.6, true)
+            end
+            W.AddNote(tt, "Measured by adding a little of the stat and seeing how much your TOTAL goes up, with your changes on the left.")
+        end
+        rows[#rows + 1] = row
+    end
+
+    -- Copy-ready text for other addons.
+    rows[#rows + 1] = { header = "Copy for other addons (click a row)" }
+    local pawn, plain = Ro.PawnString(w), Ro.PlainList(w)
+    rows[#rows + 1] = {
+        icon = "Interface\\Icons\\INV_Misc_Note_01", name = "Pawn scale", sub = pawn,
+        cols = { "", "", "copy" }, colColors = { nil, nil, W.GOLD },
+        onClick = function() T.ShowCopy("Pawn scale", pawn) end,
+        tooltip = function(tt)
+            tt:AddLine("Pawn scale", 1, 1, 1)
+            tt:AddLine("Click, then press Ctrl+C. In Pawn: Scale tab, Import, paste with Ctrl+V.", 1, 0.82, 0, true)
+            tt:AddLine(pawn, 0.91, 0.89, 0.78, true)
+            W.AddNote(tt, "🔶 This is Pawn's own scale format from the Classic-era addon. We haven't checked that Pawn runs in Forever, or that it reads Forever's \"crit by 1%\" lines as CritRating. Hover an item after importing to check.")
+        end,
+    }
+    rows[#rows + 1] = {
+        icon = "Interface\\Icons\\INV_Misc_Book_09", name = "Plain list", sub = plain,
+        cols = { "", "", "copy" }, colColors = { nil, nil, W.GOLD },
+        onClick = function() T.ShowCopy("Plain list", plain) end,
+        tooltip = function(tt)
+            tt:AddLine("Plain list", 1, 1, 1)
+            tt:AddLine("For any other gear addon, or to write down. Click, then press Ctrl+C.", 1, 0.82, 0, true)
+            tt:AddLine(plain, 0.91, 0.89, 0.78, true)
+        end,
+    }
+
+    -- Optional detail: where a weight comes from, part by part.
+    local folded = not W.IsFolded("simlab", "weightDetailOpen")   -- folded up unless you opened it
+    rows[#rows + 1] = {
+        header = "Detail: what 1 point adds to each part", foldable = true, collapsed = folded,
+        onClick = function()
+            W.SetFolded("simlab", "weightDetailOpen", folded)
+            T.Update(T.page)
+        end,
+    }
+    if not folded then
+        for _, key in ipairs({ "sp", "int", "str", "agi" }) do
+            local r = w.rows[key]
+            local def
+            for _, d in ipairs(Ro.WEIGHTS) do if d.key == key then def = d end end
+            if r and r.byPart then
+                for _, bp in ipairs(r.byPart) do
+                    rows[#rows + 1] = {
+                        icon = def.icon, name = ("1 %s → %s"):format(def.label, bp.name),
+                        sub = "part of the one number above",
+                        cols = { "", f(bp.gain, 3) .. " " .. unit, w.unitGain > 0 and f(bp.gain / w.unitGain, 2) or "?" },
+                        colColors = { nil, W.GREY, W.GREY },
+                        tooltip = function(tt)
+                            tt:AddLine(("1 %s → %s"):format(def.label, bp.name), 1, 1, 1)
+                            tt:AddLine(("These rows add up to the %s weight above. They show WHERE the value comes from: a part you use a lot (or that hits hard) gets a bigger share. A part you use rarely, like Flame Shock once every 12 sec, only gets a small share."):format(def.label), 1, 0.82, 0, true)
+                        end,
+                    }
+                end
+            end
+        end
+    end
+    return rows
+end
+
+-- A small box with the text selected, so Ctrl+C copies it.
+function T.ShowCopy(title, text)
+    local page = T.page
+    if not page then return end
+    local box = page.copyBox
+    if not box then
+        box = W.Panel(page)
+        box:SetSize(page.list.frame:GetWidth() or 384, 74)
+        box:SetPoint("BOTTOMLEFT", page.list.frame, "BOTTOMLEFT", 0, 0)
+        box:SetFrameLevel((page.list.frame:GetFrameLevel() or 1) + 10)
+        box.title = W.Text(box, "GameFontNormal", nil, "LEFT")
+        box.title:SetPoint("TOPLEFT", 10, -8)
+        box.hint = W.Text(box, "GameFontDisableSmall", nil, "LEFT")
+        box.hint:SetPoint("TOPLEFT", 10, -26)
+        box.hint:SetText("Press Ctrl+C to copy, then Esc to close.")
+        local eb = W.Create("EditBox", nil, box, { "InputBoxTemplate" })
+        eb:SetHeight(20)
+        eb:SetPoint("BOTTOMLEFT", 14, 8)
+        eb:SetPoint("BOTTOMRIGHT", -90, 8)
+        eb:SetAutoFocus(false)
+        -- Read only: typing puts the text back.
+        eb:SetScript("OnTextChanged", function(self, user)
+            if user and box.text then self:SetText(box.text); self:HighlightText() end
+        end)
+        eb:SetScript("OnEscapePressed", function(self) self:ClearFocus(); box:Hide() end)
+        eb:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+        box.edit = eb
+        local close = W.Button(box, "Close", 70)
+        close:SetPoint("BOTTOMRIGHT", -8, 7)
+        close:SetScript("OnClick", function() box:Hide() end)
+        page.copyBox = box
+    end
+    box.text = text
+    box.title:SetText(title)
+    box.edit:SetText(text)
+    box:Show()
+    box.edit:SetFocus()
+    box.edit:HighlightText()
 end
 
 ---------------------------------------------------------------------------
@@ -747,26 +1109,44 @@ function T.Update(page)
     page.note:SetPoint("RIGHT", viewId == "spells" and -158 or 0, 0)
     page.metric:SetText("Show: " .. metric.name)
 
-    if page.mentalDex.SetChecked then page.mentalDex:SetChecked(db.simMentalDex and true or false) end
     for key, row in pairs(page.sliders) do row:Set(T.add[key] or 0, false) end
     updateItemBox(page)
+    if page.copyBox and viewId ~= "weights" then page.copyBox:Hide() end
+
+    -- Talents: tick + points, read from your character unless you changed them.
+    local S = ns.SimMath
+    local anyChanged = false
+    for key, row in pairs(page.talents) do
+        local info = S.Talent(key)
+        row:SetRange(0, info.max)
+        row:Set(info.set, false)
+        if row.check.SetChecked then row.check:SetChecked(info.on) end
+        row.label:SetTextColor(info.on and 1 or 0.6, info.on and 0.82 or 0.6, info.on and 0 or 0.6)
+        anyChanged = anyChanged or info.changed
+    end
+    if anyChanged then page.talentReset:Enable() else page.talentReset:Disable() end
+    local style = ns.Rotation.Style()
+    for id, b in pairs(page.styleButtons) do
+        if id == style.id then b:LockHighlight() else b:UnlockHighlight() end
+    end
+    page.fight:Set(ns.Rotation.FightSeconds(), false)
 
     local p = ns.Profile.Player()
-    local mqRank, mqFrom = ns.SimMath.MentalQuickRank()
-    page.mentalQuick:SetText(("Mental Quickness: %d point%s (%s)"):format(mqRank, mqRank == 1 and "" or "s",
-        mqFrom == "talents" and "read from talents" or mqFrom == "setting" and "set by you" or "click to set"))
-    local opts = { mentalDex = db.simMentalDex, mentalQuick = mqRank, weapon = T.item and T.item.weapon }
-    local q, why = ns.SimMath.Apply(p, T.add, opts)
+    local opts = S.TalentOpts()
+    opts.weapon = T.item and T.item.weapon
+    local q, why = S.Apply(p, T.add, opts)
 
     local rows
     if viewId == "weapon" then
         rows = weaponRows(p, q, why, opts)
-    elseif viewId == "worth" then
-        rows = worthRows(p, mqRank)
+    elseif viewId == "weights" then
+        rows = weightRows(p, q, opts)
     elseif viewId == "stats" then
         rows = statRows(p, q, why)
-    else
+    elseif viewId == "spells" then
         rows = spellRows(p, q, why, metric)
+    else
+        rows = totalRows(p, q, why, opts)
     end
     page.list:SetRows(rows)
 end
