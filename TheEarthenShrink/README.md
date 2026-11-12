@@ -53,13 +53,14 @@ The sections are the round icon buttons down the left side of the window (like t
 | `/es healing` / `/es totems` | Open the Healing or Totems tab |
 | `/es sim` | Open the Sim Lab |
 | `/es test` | Open the Spell Power Test |
-| `/es changes` | Checks the game values the addon watches (Stormstrike, Windfury, Rockbiter, and the Mental Dexterity / Mental Quickness talent text if readable) and lists any that changed since last time. This also runs by itself a few seconds after you log in, and only prints if something changed |
+| `/es changes` | Checks the game values the addon watches (Stormstrike, Windfury, Rockbiter, the Mental Dexterity / Mental Quickness / Elemental Weapons / Spirit Weapons talent text if readable, and your points in talents that change tooltips) and lists any that changed since last time. This also runs by itself a few seconds after you log in, and only prints if something changed |
 | `/es fttotem on` / `off` | Flametongue Totem is (or isn't) in your group |
 | `/es ftstack on` / `off` | Flametongue Totem does (or doesn't) stack with Flametongue Weapon (unverified) |
 | `/es meter` | Prints what the game's damage meter tells addons (send a screenshot so we can read hits from it later) |
 | `/es inspect` | Inspect your target and open the Inspect tab |
 | `/es minimap` | Show or hide the minimap button |
 | `/es minimap reset` | Put the minimap button back in its first spot and unlock it |
+| `/es talents` | Print which of your talents change the spells and weapon buffs the addon uses, and by how much (read from each talent's text) |
 | `/es check` | Print what the addon could read from the game (helps find problems) |
 | `/es sound` (or `on` / `off`) | Turn the Windfury proc sound on or off (on by default) |
 | `/es sound test` | Test mode: prints what the game tells the addon, so you can see if Windfury procs are detected |
@@ -94,7 +95,9 @@ The sections are the round icon buttons down the left side of the window (like t
 - If Rockbiter is on your weapon now, the addon takes its attack power out of your stats before testing
 - For inspected players: their base stats, attack power and crit are estimated from their level and gear
 
-**Not counted yet:** talents, and buffs on inspected players.
+**Talents inside your tooltips (v0.12.0):** the game writes YOUR talents into YOUR spell tooltips (with Elemental Weapons, your Rockbiter tooltip shows a bigger number). The addon reads each talent's own text, finds "your Rockbiter Weapon by 14%"-style numbers, takes your talents out of the tooltip, and puts in the talents of the character it's working out: your own (no change), the Sim Lab ticks, or an inspected player's (if the game lets us read them; otherwise "counted as none", shown on the Inspect tab). Mana cost talents ("mana cost of your Shock spells by 4%") work the same way. 🔶 Unverified: that a talent's text shows the total for the points you have, and that two talents on one spell add up. `/es talents` prints what was read.
+
+**Not counted yet:** buffs on inspected players (other totems, food), and talents that change a spell by a flat number instead of a % (they're flagged in the spell's tooltip).
 
 ## "Highest rank for your level"
 

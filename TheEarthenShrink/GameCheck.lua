@@ -18,7 +18,8 @@ ns.GameCheck = G
 -- probably change with your gear; they're left out.)
 G.WATCH = { "SS", "WF", "WFT", "RB" }
 -- Talents whose text we watch (only if the game lets us read it).
-G.TALENTS = { "Mental Dexterity", "Mental Quickness" }
+G.TALENTS = { "Mental Dexterity", "Mental Quickness", "Elemental Weapons", "Spirit Weapons" }
+G.TALENT_POINTS = "Your points in talents that change tooltips"
 
 local function build()
     local version, b = ns.try(GetBuildInfo)
@@ -41,6 +42,15 @@ function G.Read()
     for _, name in ipairs(G.TALENTS) do
         local text = ns.Talents and ns.Talents.Description(name)
         if text and text ~= "" then out[name .. " talent"] = text end
+    end
+    -- Your points in talents that change these tooltips. If you spend a
+    -- point in Elemental Weapons, Rockbiter's tooltip changes, and that's
+    -- not a hotfix, so we say so.
+    local TM = ns.TalentMods
+    if TM and not TM.Data().cantRead then
+        local real, parts = TM.RealPoints() or {}, {}
+        for _, n in ipairs(TM.TalentNames()) do parts[#parts + 1] = n .. " " .. (real[n] or 0) end
+        if #parts > 0 then out[G.TALENT_POINTS] = table.concat(parts, ", ") end
     end
     return out
 end
@@ -71,6 +81,11 @@ function G.Check(quiet)
             print("  |cffffd100" .. c.label .. "|r")
             print("    was: |cff999999" .. tostring(c.old) .. "|r")
             print("    now: " .. tostring(c.new))
+        end
+        local talentsMoved = false
+        for _, c in ipairs(changes) do if c.label == G.TALENT_POINTS then talentsMoved = true end end
+        if talentsMoved then
+            ns.say("your talent points changed too, so some tooltip changes may just be your talents, not a hotfix.")
         end
         ns.say("the math reads tooltips, so it already uses the new numbers. Please send a screenshot of this to the addon thread.")
     elseif not quiet then

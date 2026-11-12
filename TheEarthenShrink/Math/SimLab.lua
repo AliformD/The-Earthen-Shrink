@@ -41,6 +41,13 @@ S.TALENTS = {
       maxFallback = 3 },   -- Angel, in game 2026-11-12: "3 ranks"
     { key = "MQ", name = "Mental Quickness", what = "Intellect gives spell power",
       maxFallback = 3 },   -- 🔶 guess; the game's number wins when the addon can read it
+    -- Talents that change weapon buffs (Angel, in game 2026-11-12: both
+    -- change Rockbiter). HOW MUCH is read from the talent's own text by
+    -- Math/TalentMods.lua; nothing here is a typed-in number.
+    { key = "EW", name = "Elemental Weapons", what = "Makes weapon buffs stronger (read from the talent text)",
+      maxFallback = 3, buff = true },   -- 🔶 max is a guess until the game tells us
+    { key = "SW", name = "Spirit Weapons", what = "Changes weapon buffs (read from the talent text)",
+      maxFallback = 3, buff = true },   -- 🔶 max is a guess until the game tells us
 }
 S.TALENT_BY_KEY = {}
 for _, t in ipairs(S.TALENTS) do S.TALENT_BY_KEY[t.key] = t end
@@ -129,8 +136,14 @@ function S.MentalDexRatio()
 end
 
 -- Points in each talent that the Sim Lab uses right now.
+-- talentPoints = every talent's points (your real ones, with the Sim Lab
+-- changes on top). Spells and weapon buffs use it, so "Real" and the tick
+-- boxes change Rockbiter and co. too (Math/TalentMods.lua).
 function S.TalentOpts()
-    return { mentalDex = S.Talent("MD").points, mentalQuick = S.Talent("MQ").points }
+    local points = {}
+    for name, n in pairs(ns.TalentMods and ns.TalentMods.RealPoints() or {}) do points[name] = n end
+    for _, t in ipairs(S.TALENTS) do points[t.name] = S.Talent(t.key).points end
+    return { mentalDex = S.Talent("MD").points, mentalQuick = S.Talent("MQ").points, talentPoints = points }
 end
 
 -- The stats you can add. Order = order of the sliders.
@@ -171,6 +184,8 @@ function S.Apply(p, add, opts)
     q.sp = {}
     for school, v in pairs(p.sp or {}) do q.sp[school] = v + (add.sp or 0) + spFromInt end
     q.source = "sim"
+    -- Talents for spells and buffs (nil = your real talents).
+    q.talentPoints = opts.talentPoints or p.talentPoints
     if spFromInt ~= 0 then
         note(("%s Intellect × %s%% × %d (Mental Quickness) = %s spell power and healing"):format(
             f(add.int), f(R.mentalQuickSpPerIntPerRank * 100), mq, f(spFromInt, 1)))

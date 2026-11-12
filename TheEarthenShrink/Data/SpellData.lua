@@ -393,11 +393,15 @@ function SD.Ranks(key)
 end
 
 -- The highest rank you can have at this level (we assume you bought it).
-function SD.Best(key, level)
+-- p = the character we're working out (optional). With it, the numbers are
+-- changed from YOUR talents (which are inside your tooltips) to p's
+-- talents. See Math/TalentMods.lua.
+function SD.Best(key, level, p)
     local best
     for _, r in ipairs(SD.Ranks(key)) do
         if r.level and r.level <= level and (not best or r.rank > best.rank) then best = r end
     end
+    if best and p and ns.TalentMods then return ns.TalentMods.AdjustRank(best, p) end
     return best
 end
 
