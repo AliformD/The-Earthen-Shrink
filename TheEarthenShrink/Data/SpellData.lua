@@ -59,30 +59,50 @@ function SD.ParseDamage(text)
     return out
 end
 
+-- Finds an attack power number in text like "increasing attack power by 29",
+-- "29 attack power" or "104 extra melee attack power".
+local function findAP(lower)
+    return tonumber(lower:match("attack power by " .. NUM) or lower:match(NUM .. "[%a ]-attack power"))
+end
+SD.FindAP = findAP
+
+local WORDS = { one = 1, two = 2, three = 3, an = 1, a = 1 }
+
 -- Reads the numbers out of a weapon imbue description.
+-- The Forever rank 1 Windfury text (from Angel, 2026-11-12) is:
+--   "Each hit has a 20% chance of granting you two extra attacks with 104
+--    extra melee attack power."
+-- Older versions of this code missed the word "melee" and gave up.
 function SD.ParseImbue(key, text)
     text = stripCodes(text)
     if not text then return nil end
     local lower = text:lower()
     local out = {}
     if key == "RB" then
-        out.ap = tonumber(lower:match("attack power by " .. NUM) or lower:match(NUM .. " attack power"))
+        out.ap = findAP(lower)
         if not out.ap then return nil end
-    elseif key == "FT" then
-        local a, b = lower:match(NUM .. " to " .. NUM)
+    elseif key == "FT" or key == "FB" then
+        local school = key == "FT" and "fire" or "frost"
+        local a, b = lower:match(NUM .. " to " .. NUM .. " additional " .. school)
+        if not a then a, b = lower:match(NUM .. " to " .. NUM) end
         if not a then
-            a = lower:match(NUM .. " additional %a+ damage") or lower:match(NUM .. " %a+ damage")
+            a = lower:match(NUM .. " additional " .. school) or lower:match(NUM .. " " .. school .. " damage")
+                or lower:match(NUM .. " additional %a+ damage") or lower:match(NUM .. " %a+ damage")
             b = a
         end
         if not a then return nil end
         out.min, out.max = tonumber(a), tonumber(b)
+        -- Some versions of Flametongue also add spell power. We show it, but
+        -- it only helps spells, not the melee comparison.
+        out.sp = tonumber(lower:match("spell damage by " .. NUM) or lower:match("spell power by " .. NUM))
+        -- Frostbrand usually doesn't say its chance. nil = use the setting.
+        out.chance = tonumber(lower:match(NUM .. "%% chance"))
     elseif key == "WF" then
         out.chance = tonumber(lower:match(NUM .. "%% chance"))
-        out.ap = tonumber(lower:match(NUM .. " extra attack power") or lower:match(NUM .. " attack power"))
-        local n = lower:match(NUM .. " extra attacks") or lower:match("(%a+) extra attacks")
-        local words = { one = 1, two = 2, three = 3, an = 1 }
-        out.attacks = tonumber(n) or words[n or ""] or 2
-        out.attacksGuessed = not (tonumber(n) or words[n or ""])
+        out.ap = findAP(lower)
+        local n = lower:match(NUM .. " extra attack") or lower:match("(%a+) extra attack")
+        out.attacks = tonumber(n) or WORDS[n or ""] or 2
+        out.attacksGuessed = not (tonumber(n) or WORDS[n or ""])
         if not out.chance or not out.ap then return nil end
     end
     return out
@@ -260,6 +280,7 @@ local function readRank(spell, id, rank, guessLevel)
     elseif k == "totem" then
         rec.totem = SD.ParseTotem(spell.totem, rec.desc)
         rec.parsed = rec.totem ~= nil
+        if spell.key == "WFT" then rec.imbue = SD.ParseImbue("WF", rec.desc) end
     elseif k == "shield" then
         rec.shield = SD.ParseShield(rec.desc)
         rec.parsed = rec.shield ~= nil
@@ -428,6 +449,15 @@ function SD.PrintCheck()
             s.name, #list, parsed, fromGame))
     end
     for _, d in ipairs(SD.discarded) do ns.say("|cffff8000skipped:|r " .. d) end
+    -- Weapon buffs: show the exact text, so a reading problem is easy to spot.
+    local lvl = UnitLevel("player") or 1
+    for _, key in ipairs({ "RB", "FT", "FB", "WF", "WFT" }) do
+        local r = SD.Best(key, lvl)
+        if r then
+            ns.say(("%s rank %d: %s |cffaaaaaa%s|r"):format(r.name, r.rank,
+                r.imbue and "|cff1eff00numbers read|r" or "|cffff4a3acouldn't read numbers|r", r.desc or "(no text from the game)"))
+        end
+    end
     local lb = SD.Best("LB", UnitLevel("player") or 1)
     if lb then ns.say(("Lightning Bolt rank %d tooltip: %s"):format(lb.rank, lb.desc or "(empty)")) end
 end

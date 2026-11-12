@@ -9,7 +9,7 @@ ns.Chat = C
 
 C.MAX = 255
 
-local SHORT = { RB = "Rockbiter", FT = "Flametongue", WF = "Windfury" }
+local SHORT = { RB = "Rockbiter", FT = "Flametongue", FB = "Frostbrand", WF = "Windfury" }
 
 function C.Build(p, list)
     local parts = {}

@@ -33,7 +33,7 @@ GameTooltip = newObj("GameTooltip")
 local tlines = {}
 GameTooltip.AddLine = function(_, s) tlines[#tlines+1] = s end
 GameTooltip.AddDoubleLine = function(_, a, b) tlines[#tlines+1] = a .. "  ||  " .. b end
-function print(...) io.write(table.concat({...}, " "), "\n") end
+function print(...) local t = {...}; for i = 1, select("#", ...) do t[i] = tostring(t[i]) end; io.write(table.concat(t, " "), "\n") end
 C_Timer = { After = function(s, fn) PENDING = PENDING or {}; PENDING[#PENDING+1] = fn end }
 function InCombatLockdown() return false end
 function UnitName(u) return u == "player" and "Angel" or "Kaz" end
@@ -80,7 +80,11 @@ SPELLS = {
   [8017]= { name="Rockbiter Weapon", rank=1, mana=20, cast=0, desc="Imbue the Shaman's weapon, increasing attack power by 50 for 60 min.", lvl=1 },
   [10399]={ name="Rockbiter Weapon", rank=4, mana=60, cast=0, desc="Imbue the Shaman's weapon, increasing attack power by 150 for 60 min.", lvl=24 },
   [8030]= { name="Flametongue Weapon", rank=3, mana=60, cast=0, desc="Imbue the Shaman's weapon with fire. Each hit causes 4.71 to 18 additional Fire damage, based on the speed of the weapon.", lvl=26 },
-  [8232]= { name="Windfury Weapon", rank=1, mana=95, cast=0, desc="Imbue the Shaman's weapon with wind. Each hit has a 20% chance of dealing additional damage equal to two extra attacks with 104 extra attack power.", lvl=30 },
+  -- Real Forever rank 1 text (Angel, 2026-11-12). "melee" broke the old reader.
+  [8232]= { name="Windfury Weapon", rank=1, mana=95, cast=0, desc="Imbue the Shaman's weapon with wind. Each hit has a 20% chance of granting you two extra attacks with 104 extra melee attack power. When applied to main hand, disables any benefit you personally receive from Windfury Totem.", lvl=30 },
+  [8033]= { name="Frostbrand Weapon", rank=1, mana=50, cast=0, desc="Imbue the Shaman's weapon with frost. Each hit has a chance of causing 23 additional Frost damage and slowing the target.", lvl=20 },
+  [8038]= { name="Frostbrand Weapon", rank=2, mana=70, cast=0, desc="Imbue the Shaman's weapon with frost. Each hit has a chance of causing 34 additional Frost damage and slowing the target.", lvl=28 },
+  [8512]= { name="Windfury Totem", rank=1, mana=115, cast=0, desc="Summons a Windfury Totem. Party members' melee attacks have a 20% chance of granting 1 extra attack with 122 extra attack power. Lasts 2 min.", lvl=30 },
   [324] = { name="Lightning Shield", rank=1, mana=45, cast=0, desc="Surrounds the caster with balls of lightning that deal 13 Nature damage to attackers. 3 charges. Lasts 10 min.", lvl=8 },
   [905] = { name="Lightning Shield", rank=3, mana=100, cast=0, desc="Surrounds the caster with balls of lightning that deal 50 Nature damage to attackers. 3 charges. Lasts 10 min.", lvl=24 },
   [3599]= { name="Searing Totem", rank=1, mana=25, cast=0, desc="Summons a Searing Totem that attacks one enemy within 20 yards for 9 to 11 Fire damage. Lasts 30 sec.", lvl=10 },
@@ -184,3 +188,59 @@ SlashCmdList.THEEARTHENSHRINK("sound on")
 SlashCmdList.THEEARTHENSHRINK("sound test")
 print("sounds played (expect 2: test + 1 proc):", SOUNDS)
 assert(SOUNDS == 2)
+
+-- Weapon buff comparison tests -------------------------------------------
+local function compare()
+  local out = {}
+  for _, e in ipairs(ns.ImbueMath.Compare(ns.Profile.Player())) do
+    out[e.key] = e
+  end
+  return out, ns.ImbueMath.Compare(ns.Profile.Player())[1].key
+end
+local base, best = compare()
+print("default:", best, "WF", base.WF.calc.dps, "RB", base.RB.calc.dps, "FT", base.FT.calc.dps, "FB", base.FB.calc.dps)
+assert(base.WF.calc and not base.WF.calc.fromFallback, "WF tooltip should be read now")
+
+-- Windfury Totem on: the totem helps every buff; WF still adds on top if they stack
+SlashCmdList.THEEARTHENSHRINK("wftotem on")
+local t1 = compare()
+print("totem on, stacks:", "WF", t1.WF.calc.dps, "RB", t1.RB.calc.dps)
+assert(t1.RB.calc.dps > base.RB.calc.dps, "Rockbiter should gain from totem extra attacks")
+SlashCmdList.THEEARTHENSHRINK("wfstack off")
+local t2 = compare()
+print("totem on, no stack:", "WF", t2.WF.calc.dps, "RB", t2.RB.calc.dps)
+assert(t2.WF.calc.dps < t1.WF.calc.dps, "WF should be worth less when it turns the totem off")
+SlashCmdList.THEEARTHENSHRINK("wftotem off")
+SlashCmdList.THEEARTHENSHRINK("wfstack on")
+
+-- Flametongue spell power setting
+SlashCmdList.THEEARTHENSHRINK("ftcoef 0.5")
+local c1 = compare()
+print("ftcoef 0.5: FT", c1.FT.calc.dps)
+assert(c1.FT.calc.dps > base.FT.calc.dps)
+SlashCmdList.THEEARTHENSHRINK("ftcoef 0")
+
+-- Tooltip missing: Windfury rank 1 falls back to the built-in numbers
+local saved = SPELLS[8232].desc
+SPELLS[8232].desc = ""
+ns.SpellData.Rebuild()
+local fb = compare()
+print("WF no tooltip:", fb.WF.calc and fb.WF.calc.dps, fb.WF.calc and fb.WF.calc.fromFallback)
+assert(fb.WF.calc and fb.WF.calc.fromFallback and math.abs(fb.WF.calc.dps - base.WF.calc.dps) < 0.01)
+SPELLS[8232].desc = saved
+ns.SpellData.Rebuild()
+
+-- Rockbiter already on the weapon: its 150 AP is taken out first
+local oldTT = C_TooltipInfo.GetInventoryItem
+C_TooltipInfo.GetInventoryItem = function(u, slot)
+  local d = oldTT(u, slot)
+  if slot == 16 then table.insert(d.lines, { leftText = "Rockbiter 4 (59 min)" }) end
+  return d
+end
+local oldAP = UnitAttackPower
+function UnitAttackPower() return 450, 40, 0 end   -- 340 + 150 from Rockbiter
+local rb = compare()
+print("Rockbiter on:", "WF", rb.WF.calc.dps, "RB", rb.RB.calc.dps)
+assert(math.abs(rb.WF.calc.dps - base.WF.calc.dps) < 0.01, "Rockbiter AP should be removed")
+C_TooltipInfo.GetInventoryItem, UnitAttackPower = oldTT, oldAP
+print("weapon buff tests passed")
