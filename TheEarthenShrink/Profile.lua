@@ -244,6 +244,13 @@ function P.FromGear(unit, info)
     else
         p.talentPoints = {}   -- not a Shaman: no Shaman talents
     end
+    -- Mental Dexterity: their Intellect also gives attack power.
+    local md = p.talentPoints["Mental Dexterity"] or 0
+    if md > 0 and ns.SimMath then
+        p.apFromInt = int * ns.SimMath.MentalDexRatio() * md
+        p.ap = p.ap + p.apFromInt
+    end
+    p.mentalDex = md
     p.sp = {}
     for school in pairs(SCHOOL_INDEX) do p.sp[school] = spGear + spInt end
     p.healing = spGear + spInt
