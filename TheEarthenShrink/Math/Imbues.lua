@@ -18,8 +18,7 @@ ns.ImbueMath = M
 
 M.RULES = {
     apPerDps = 14,          -- 🔶 14 attack power = +1 weapon DPS
-    meleeMiss = 5,          -- 🔶 % miss chance vs a mob your level (hit gear lowers it)
-    dodge = 5,              -- 🔶 % chance the mob dodges
+    -- Miss, dodge and hit cap rules live in Math/HitCrit.lua now.
     meleeCritBonus = 1.0,   -- 🔶 a melee crit does +100% damage
     spellCritBonus = 0.5,   -- 🔶 a fire/frost crit does +50% damage
     ftRefSpeed = 4.0,       -- 🔶 Flametongue tooltip max = a 4.0 speed weapon
@@ -32,11 +31,7 @@ M.SHORT = { RB = "Rockbiter", FT = "Flametongue", FB = "Frostbrand", WF = "Windf
 
 local function db() return ns.db() end
 
-local function landChance(p)
-    local R = M.RULES
-    local miss = math.max(0, R.meleeMiss - (p.hit or 0))
-    return math.max(0, 1 - (miss + R.dodge) / 100)
-end
+local function landChance(p) return ns.HitCrit.LandChance(p) end
 
 -- The numbers for one rank: from the tooltip, or the built-in list if the
 -- tooltip couldn't be read. Returns data, fromFallback.

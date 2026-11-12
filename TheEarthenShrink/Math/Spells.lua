@@ -11,8 +11,7 @@ ns.SpellMath = M
 
 M.RULES = {
     gcd = 1.5,                -- 🔶 global cooldown for spells, in seconds
-    baseSpellHit = 96,        -- 🔶 % chance to hit a mob your own level
-    maxSpellHit = 99,         -- 🔶 you can never go above this
+    -- Spell hit chance and hit cap: see Math/HitCrit.lua.
     spellCritBonus = 0.5,     -- 🔶 a spell crit does +50% damage
     -- 🔶 How much of your spell power a spell gets ("coefficient"):
     --    cast time ÷ 3.5 for normal spells (instant spells count as 1.5 sec),
@@ -81,7 +80,7 @@ function M.Calc(spell, rank, profile)
     if d.dot then dotBase = math.max(0, dotBase - inTip * dotC) end
     local direct = avgBase + sp * directC
     local dot = d.dot and (dotBase + sp * dotC) or 0
-    local hit = math.min(R.maxSpellHit, R.baseSpellHit + (profile.spellHit or 0)) / 100
+    local hit = ns.HitCrit.SpellHitChance(profile)
     local critMult = 1 + (profile.spellCrit or 0) / 100 * R.spellCritBonus
 
     local c = {}

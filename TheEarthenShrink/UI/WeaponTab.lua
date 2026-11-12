@@ -161,7 +161,7 @@ local STAT_INFO = {
     ap     = { icon = "Interface\\Icons\\Ability_Warrior_BattleShout", tip = "Attack power. Every 14 adds 1 DPS. Windfury's extra attacks use it, so more AP makes Windfury better." },
     mcrit  = { icon = "Interface\\Icons\\Ability_CriticalStrike", tip = "Melee crit chance. Makes Rockbiter and Windfury hits crit more often." },
     scrit  = { icon = "Interface\\Icons\\Spell_Nature_StormReach", tip = "Spell crit chance. Flametongue's fire damage uses this one." },
-    hit    = { icon = "Interface\\Icons\\Ability_Marksmanship", tip = "Hit from gear lowers your miss chance. Every buff here only works on hits that land." },
+    hit    = { icon = "Interface\\Icons\\Ability_Marksmanship", tip = "Hit chance from gear and talents lowers your miss chance (the game's own number). Every buff here only works on hits that land. This tab uses a same-level mob; the Sim Lab can switch to a boss." },
     sp     = { icon = "Interface\\Icons\\Spell_Nature_Lightning", tip = "Spell power. Used by your spells, and by Flametongue's fire if your SP Test (or the setting) says it scales. For another player it's the spell power on their gear, plus Mental Quickness if their talents can be read." },
     mana   = { icon = "Interface\\Icons\\INV_Potion_76", tip = "Your mana pool. The Spell Efficiency tab uses it for '% of mana' and 'casts per mana bar'." },
 }
@@ -191,7 +191,7 @@ function ns.ProfileRows(p)
     add("ap", "Attack power", f(p.ap or 0), "ap")
     add("mcrit", "Melee crit", f(p.meleeCrit or 0, 2) .. "%", "meleeCrit")
     add("scrit", "Spell crit", f(p.spellCrit or 0, 2) .. "%", "spellCrit")
-    add("hit", "Hit from gear", f(p.hit or 0) .. "%")
+    add("hit", "Hit chance bonus (gear + talents)", f(p.hit or 0) .. "%")
     add("sp", "Spell power", f(p.sp and p.sp.Nature or 0), "sp")
     if p.source == "inspect" then
         local r = rows[#rows]

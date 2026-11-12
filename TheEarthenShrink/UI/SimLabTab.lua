@@ -244,6 +244,10 @@ local function buildSliders(page, top, height)
                 T.add[st.key] = v
                 T.Update(page)
             end,
+            tooltip = st.tip and function(tt)
+                tt:AddLine(st.label, 1, 1, 1)
+                tt:AddLine(st.tip, 1, 0.82, 0, true)
+            end or nil,
         })
         row:SetPoint("TOPLEFT", 10, -26 - (i - 1) * 25)
         page.sliders[st.key] = row
@@ -880,10 +884,124 @@ local WHAT = {
     sp = "Spell power makes shocks, Lightning Shield, totems, Lightning Bolt and Flametongue fire hit harder.",
     heal = "Healing makes your heals bigger. Items that say \"damage and healing\" give you this AND Spell Power; Pawn counts both.",
     ap = "Attack power: every melee hit, Stormstrike and the weapon buffs (🔶 14 attack power = 1 weapon DPS).",
-    crit = "Forever uses one crit chance for melee and spells, so 1% crit helps both. Flametongue's fire uses spell crit.",
-    hit = "Fewer misses for melee and spells (🔶 Classic miss chances).",
+    crit = "Crit CHANCE: how often a hit is a critical hit. Blizzard says Forever combines melee and spell crit, so 1% from gear helps both.",
+    hit = "Hit CHANCE: fewer misses. Blizzard says Forever combines melee and spell hit, so 1% from gear helps both. It also means more Windfury procs, because only a hit that lands can proc.",
     wdps = "The DPS number on a weapon. Only counts for your main hand.",
 }
+
+---------------------------------------------------------------------------
+-- Crit chance and hit chance, explained (Angel: "what does Crit (1%) mean?")
+---------------------------------------------------------------------------
+
+-- The short grey line under the Crit chance / Hit chance rows.
+function T.CritHitSub(key, q)
+    local H = ns.HitCrit
+    if key == "crit" then
+        local c = H.Conversions(q.level)
+        return ("1%% = about %s Agility or %s Intellect"):format(f(c.agi), f(c.int))
+    elseif key == "hit" then
+        local melee, spell = H.Caps(q)
+        return ("you have %s%% · cap %s%% melee, %s%% spells"):format(f(q.hit or 0, 1), f(melee), f(spell))
+    end
+end
+
+-- Extra hover lines for the two "per 1%" rows.
+function T.PercentNote(tt, key, q)
+    local H = ns.HitCrit
+    tt:AddLine(" ")
+    tt:AddLine("\"1%\" means one PERCENTAGE POINT of chance (like 9.6% to 10.6%), not one point on an item. So you can't compare this number with 1 Intellect or 1 Strength by eye.", 0.4, 0.8, 1, true)
+    if key == "crit" then
+        local c = H.Conversions(q.level)
+        tt:AddDoubleLine("1% melee crit from Agility", f(c.agi, 1) .. " Agility", 1, 0.82, 0, 1, 1, 1)
+        tt:AddDoubleLine("1% spell crit from Intellect", f(c.int, 1) .. " Intellect", 1, 0.82, 0, 1, 1, 1)
+        tt:AddLine(c.agiFromGame and c.intFromGame and "|cff1eff00Both read from the game.|r"
+            or "|cffff8000🔶 Classic rule (the game didn't tell us), not checked in Forever.|r", 1, 1, 1, true)
+    else
+        local melee, spell = H.Caps(q)
+        tt:AddDoubleLine("Your hit now", f(q.hit or 0, 1) .. "%", 1, 0.82, 0, 1, 1, 1)
+        tt:AddDoubleLine("Melee hit cap (" .. H.Target(q).short .. ")", f(melee) .. "% 🔶", 1, 0.82, 0, 1, 1, 1)
+        tt:AddDoubleLine("Spell hit cap (" .. H.Target(q).short .. ")", f(spell) .. "% 🔶", 1, 0.82, 0, 1, 1, 1)
+        tt:AddLine("Past a cap, more hit does nothing there, so this weight drops. 🔶 Caps are Classic numbers: Blizzard hasn't announced Forever's.", 0.91, 0.89, 0.78, true)
+    end
+end
+
+-- The "Hit and crit" rows under the weights.
+function T.CritHitRows(rows, w, q)
+    local H = ns.HitCrit
+    local target = H.Target(q)
+    local melee, spell = H.Caps(q)
+    local hit = q.hit or 0
+    rows[#rows + 1] = { header = "Hit and crit, explained (hover)" }
+
+    rows[#rows + 1] = {
+        icon = "Interface\\Icons\\Ability_Hunter_SniperShot", name = "Target: " .. target.name,
+        sub = "click to switch same level / boss", cols = { "", "", "switch" }, colColors = { nil, nil, W.GOLD },
+        onClick = function()
+            local db = ns.db()
+            db.simTarget = (db.simTarget == "boss") and "same" or "boss"
+            T.Update(T.page)
+        end,
+        tooltip = function(tt)
+            tt:AddLine("Who you're fighting", 1, 1, 1)
+            tt:AddLine("Bosses are 3 levels higher than you, so you miss them more and the hit cap is higher. This changes every number in the Sim Lab, not other tabs.", 1, 0.82, 0, true)
+            W.AddNote(tt, "🔶 Miss chances are Classic numbers: melee 5% (same level) / 9% (boss), spells 3% / 16% you can remove, plus 1% that always misses.")
+        end,
+    }
+
+    local function capLine(name, cap)
+        if hit >= cap then return name .. " capped", W.GREEN end
+        return ("%s %s%% more to cap"):format(name, f(cap - hit, 1)), W.WHITE
+    end
+    local mText = capLine("melee", melee)
+    local sText = capLine("spells", spell)
+    rows[#rows + 1] = {
+        icon = "Interface\\Icons\\Ability_Marksmanship", name = ("Hit: you have %s%%, cap %s%% / %s%%"):format(f(hit, 1), f(melee), f(spell)),
+        sub = mText .. " · " .. sText .. " 🔶", cols = { "", "", "" },
+        tooltip = function(tt)
+            tt:AddLine("Hit chance and the hit cap", 1, 1, 1)
+            tt:AddLine("Every attack can miss. Hit from gear (and talents) takes misses away, 1% at a time. When you have enough that you never miss, you're \"hit capped\" and more hit does nothing.", 1, 0.82, 0, true)
+            tt:AddLine(" ")
+            tt:AddDoubleLine("Your hit (gear + talents, from the game)", f(hit, 1) .. "%", 1, 0.82, 0, 1, 1, 1)
+            tt:AddDoubleLine("Melee cap vs " .. target.short, f(melee) .. "%", 1, 0.82, 0, 1, 1, 1)
+            tt:AddDoubleLine("Spell cap vs " .. target.short, f(spell) .. "%", 1, 0.82, 0, 1, 1, 1)
+            tt:AddLine(" ")
+            tt:AddLine("That's why hit can be worth a lot now and almost nothing later: the Hit chance weight above already counts how far you are from the caps.", 0.91, 0.89, 0.78, true)
+            tt:AddLine("Dodges (5% 🔶) are not misses: hit doesn't remove them.", 0.91, 0.89, 0.78, true)
+            W.AddNote(tt, "🔶 Blizzard hasn't announced Forever's hit caps. These are Classic numbers. Forever also replaces weapon skill with Expertise (not counted here).")
+        end,
+    }
+
+    local fl = select(2, H.FlurryFactor(q))
+    rows[#rows + 1] = {
+        icon = "Interface\\Icons\\Ability_CriticalStrike", name = "Crit chance vs crit damage",
+        sub = ("melee crit %s%% · spell crit %s%%"):format(f(q.meleeCrit or 0, 2), f(q.spellCrit or 0, 2)),
+        cols = { "", "", "" },
+        tooltip = function(tt)
+            local c = H.Conversions(q.level)
+            tt:AddLine("Crit chance vs crit damage", 1, 1, 1)
+            tt:AddLine("Crit CHANCE is how OFTEN a hit is a critical hit. Crit DAMAGE is how BIG a critical hit is. Gear in Forever gives crit chance. Nothing here changes crit damage.", 1, 0.82, 0, true)
+            tt:AddLine(" ")
+            tt:AddDoubleLine("Melee crit does", "double (+100%) 🔶", 1, 0.82, 0, 1, 1, 1)
+            tt:AddDoubleLine("Spell crit does", "1.5× (+50%) 🔶", 1, 0.82, 0, 1, 1, 1)
+            tt:AddLine(" ")
+            tt:AddLine("Where crit chance comes from:", 1, 1, 1)
+            tt:AddDoubleLine("   Agility → melee crit", ("%s Agility = 1%%"):format(f(c.agi, 1)), 0.91, 0.89, 0.78, 1, 1, 1)
+            tt:AddDoubleLine("   Intellect → spell crit", ("%s Intellect = 1%%"):format(f(c.int, 1)), 0.91, 0.89, 0.78, 1, 1, 1)
+            tt:AddDoubleLine("   Gear crit → both", "1% = 1%", 0.91, 0.89, 0.78, 1, 1, 1)
+            tt:AddLine(" ")
+            tt:AddLine(("So 1%% crit from gear is worth a lot more than 1 Intellect, but you'd need about %s Intellect to get the same 1%% spell crit, and those %s Intellect also give mana, attack power and spell power. Per POINT, Intellect still wins."):format(f(c.int), f(c.int)), 0.91, 0.89, 0.78, true)
+            if fl then
+                tt:AddLine(" ")
+                tt:AddLine(("Flurry %d: after a melee crit your next 3 swings are %s%% faster, so crit also means more swings (counted)."):format(fl.points, f(fl.pct)), 0.4, 0.8, 1, true)
+            else
+                tt:AddLine(" ")
+                tt:AddLine("No Flurry found in your talents. If you take Flurry, crit gets worth more (faster swings after a crit).", 0.6, 0.6, 0.6, true)
+            end
+            W.AddNote(tt, (c.agiFromGame and c.intFromGame) and "Agility/Intellect numbers read from the game. Crit damage (×2 / ×1.5) is a Classic number 🔶."
+                or "🔶 Agility/Intellect per 1% and crit damage are Classic numbers: the game didn't tell us, and they're not checked in Forever yet.")
+        end,
+    }
+end
 
 local function weightRows(p, q, opts)
     local Ro = ns.Rotation
@@ -915,7 +1033,7 @@ local function weightRows(p, q, opts)
         local row = {
             icon = def.icon, name = def.label,
             nameColor = isBase and W.WHITE or nil,
-            sub = r.estimate and "no damage; our estimate (hover)" or topParts(r.byPart),
+            sub = r.estimate and "no damage; our estimate (hover)" or T.CritHitSub(def.key, q) or topParts(r.byPart),
             cols = { "", r.estimate and "-" or (f(r.gain, 3) .. " " .. unit), weight and f(weight, 2) or "?" },
             colColors = { W.GREY, W.GREY, r.estimate and W.ORANGE or ((weight or 0) > 0.005 and W.GREEN or W.GREY) },
             meter = weight and math.max(0, math.min(1, weight)) or 0,
@@ -929,8 +1047,9 @@ local function weightRows(p, q, opts)
                 return
             end
             tt:AddLine(WHAT[def.key] or "", 1, 0.82, 0, true)
+            if def.percent then T.PercentNote(tt, def.key, q) end
             tt:AddLine(" ")
-            tt:AddDoubleLine(("1 %s%s adds"):format((def.label:gsub(" %(1%%%)", "")), def.percent and "%" or ""),
+            tt:AddDoubleLine(def.percent and ("1%% %s adds"):format((def.label:gsub(" %(per 1%%%)", ""))) or ("1 %s adds"):format(def.label),
                 f(r.gain, 3) .. " " .. unit, 1, 0.82, 0, 1, 1, 1)
             for _, bp in ipairs(r.byPart or {}) do
                 tt:AddDoubleLine("   " .. bp.name, (bp.gain > 0 and "+" or "") .. f(bp.gain, 3), 0.91, 0.89, 0.78, 1, 1, 1)
@@ -952,6 +1071,8 @@ local function weightRows(p, q, opts)
         end
         rows[#rows + 1] = row
     end
+
+    T.CritHitRows(rows, w, q)
 
     -- Copy-ready text for other addons.
     rows[#rows + 1] = { header = "Copy for other addons (click a row)" }
@@ -1061,7 +1182,7 @@ local STAT_ROWS = {
     { "Healing", "healing", 0, "Interface\\Icons\\Spell_Nature_HealingTouch" },
     { "Spell Crit", "spellCrit", 2, "Interface\\Icons\\Spell_Fire_FlameBolt", "%" },
     { "Melee Crit", "meleeCrit", 2, "Interface\\Icons\\Ability_CriticalStrike", "%" },
-    { "Hit", "spellHit", 0, "Interface\\Icons\\Ability_Marksmanship", "%" },
+    { "Hit chance", "spellHit", 0, "Interface\\Icons\\Ability_Marksmanship", "%" },
     { "Max Mana", "mana", 0, "Interface\\Icons\\Spell_Shadow_ManaBurn" },
 }
 
