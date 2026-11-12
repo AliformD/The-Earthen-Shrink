@@ -202,9 +202,21 @@ function P.FromGear(unit, info)
     p.meleeCrit = E.meleeCrit(agi) + (g.crit or 0)
     p.spellCrit = E.spellCrit(L, int) + (g.crit or 0)
     p.hit, p.spellHit = g.hit or 0, g.hit or 0
+    -- Spell power: the game has no way to ask for another player's spell
+    -- power (that function only answers for you), so we add up the spell
+    -- power written on their gear. Mental Quickness (Intellect gives spell
+    -- power) is added if their talents can be read. 🔶 Untested in Forever.
+    local spGear = g.sp or 0
+    local mq = p.isShaman and ns.Talents and ns.Talents.Rank("Mental Quickness", unit) or nil
+    local spInt = 0
+    if mq and mq > 0 then
+        spInt = int * ns.SimMath.RULES.mentalQuickSpPerIntPerRank * mq
+        p.estimated.sp = true   -- their total Intellect is an estimate
+    end
+    p.mentalQuick, p.spFromGear, p.spFromInt = mq, spGear, spInt
     p.sp = {}
-    for school in pairs(SCHOOL_INDEX) do p.sp[school] = g.sp or 0 end
-    p.healing = g.sp or 0
+    for school in pairs(SCHOOL_INDEX) do p.sp[school] = spGear + spInt end
+    p.healing = spGear + spInt
     if not p.mana then p.mana = math.floor(55 + 18.5 * L + 15 * math.max(0, int - 20)) end
     p.estimated.ap, p.estimated.meleeCrit, p.estimated.spellCrit = true, true, true
 

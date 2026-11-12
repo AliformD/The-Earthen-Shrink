@@ -11,6 +11,11 @@
 --   * Or pick the item up and drop it on the box.
 -- The item's stats are compared with what you wear in that slot, and the
 -- sliders are set to the difference.
+--
+-- Layout (simple on purpose):
+--   Left:  "1. Change stats": the sliders and your talents.
+--   Right: "2. See what changes": four buttons pick ONE view at a time:
+--          Spells, Weapon buff, Stat value, My stats.
 
 local _, ns = ...
 local W = ns.Widgets
@@ -93,10 +98,10 @@ local function buildItemBox(page, width)
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    page.itemName = W.Text(box, "GameFontNormal", nil, "LEFT")
+    page.itemName = W.OneLine(W.Text(box, "GameFontNormal", nil, "LEFT"))
     page.itemName:SetPoint("TOPLEFT", btn, "TOPRIGHT", 10, -3)
     page.itemName:SetPoint("RIGHT", -210, 0)
-    page.itemSub = W.Text(box, "GameFontDisableSmall", nil, "LEFT")
+    page.itemSub = W.OneLine(W.Text(box, "GameFontDisableSmall", nil, "LEFT"))
     page.itemSub:SetPoint("BOTTOMLEFT", btn, "BOTTOMRIGHT", 10, 3)
     page.itemSub:SetPoint("RIGHT", -210, 0)
 
@@ -122,7 +127,7 @@ local function buildSliders(page, top, height)
 
     local title = W.Text(panel, "GameFontNormalSmall", nil, "LEFT")
     title:SetPoint("TOPLEFT", 10, -7)
-    title:SetText("ADD OR TAKE AWAY STATS")
+    title:SetText("1. CHANGE YOUR STATS")
     title:SetTextColor(0.6, 0.6, 0.6)
     local reset = W.Button(panel, "Reset", 64)
     reset:SetHeight(18)
@@ -148,8 +153,9 @@ local function buildSliders(page, top, height)
     cb:SetPoint("BOTTOMLEFT", 6, 21)
     local label = W.Text(panel, "GameFontHighlightSmall", nil, "LEFT")
     label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
-    label:SetText("I have Mental Dexterity (Intellect gives attack power)")
+    label:SetText("Mental Dexterity (Intellect gives attack power)")
     label:SetPoint("RIGHT", -6, 0)
+    W.OneLine(label)
     cb:SetScript("OnClick", function(self)
         ns.db().simMentalDex = self:GetChecked() and true or false
         T.Update(page)
@@ -185,6 +191,31 @@ local function buildSliders(page, top, height)
     page.mentalQuick = mq
 end
 
+-- The four views on the right. cols = the column titles for that view.
+local VIEWS = {
+    { id = "spells", label = "Spells",      title = "Your spells (highest rank)",  cols = { "Now", "Try", "Change" },
+      note = "Try = with your changes. Hover a row for the math." },
+    { id = "weapon", label = "Weapon buff", title = "Best weapon buff (DPS added)", cols = { "Now", "Try", "Change" },
+      note = "Move Spell Power or Attack Power to see when the best buff changes." },
+    { id = "worth",  label = "Stat value",  title = "What 1 point is worth",       cols = { "", "DPS", "Same as" },
+      note = "Uses your SP Test results. Bigger DPS = that stat helps more." },
+    { id = "stats",  label = "My stats",    title = "Your stats",                  cols = { "Now", "Try", "Change" },
+      note = "Now = from the game. Try = with your changes." },
+}
+local VIEW_BY_ID = {}
+for _, v in ipairs(VIEWS) do VIEW_BY_ID[v.id] = v end
+
+function T.View()
+    local id = ns.db().simView
+    return VIEW_BY_ID[id] and id or "spells"
+end
+
+function T.SetView(id)
+    if not VIEW_BY_ID[id] then return end
+    ns.db().simView = id
+    if T.page then T.Update(T.page) end
+end
+
 function T.Build(page)
     local width = ns.UI.CONTENT_W
     T.page = page
@@ -192,22 +223,38 @@ function T.Build(page)
     buildItemBox(page, width)
     buildSliders(page, -58, 368)
 
-    page.list = W.List(page, width - 308, 340, {
+    -- "2. See what changes": one button per view.
+    local x, right = 308, width - 308
+    page.viewButtons = {}
+    local bw = (right - 3 * 4) / #VIEWS
+    for i, v in ipairs(VIEWS) do
+        local b = W.Button(page, v.label, bw)
+        b:SetPoint("TOPLEFT", x + (i - 1) * (bw + 4), -58)
+        b:SetScript("OnClick", function() T.SetView(v.id) end)
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(v.label, 1, 1, 1)
+            GameTooltip:AddLine(v.note, 1, 0.82, 0, true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        page.viewButtons[v.id] = b
+    end
+
+    page.list = W.List(page, right, 312, {
         { title = "Now", width = 54 }, { title = "Try", width = 54 }, { title = "Change", width = 56 },
     })
-    page.list.frame:SetPoint("TOPLEFT", 308, -58)
-    page.list:SetNameTitle("With your current gear")
+    page.list.frame:SetPoint("TOPLEFT", x, -86)
 
-    page.metric = W.Button(page, "", 170)
+    page.metric = W.Button(page, "", 150)
     page.metric:SetPoint("BOTTOMRIGHT", 0, 0)
     page.metric:SetScript("OnClick", function()
         T.metric = T.metric % #METRICS + 1
         T.Update(page)
     end)
-    page.note = W.Text(page, "GameFontDisableSmall", nil, "LEFT")
-    page.note:SetPoint("BOTTOMLEFT", page.list.frame, "BOTTOMLEFT", 0, -22)
-    page.note:SetPoint("RIGHT", page.metric, "LEFT", -8, 0)
-    page.note:SetText("Hover a row for the math.")
+    page.note = W.OneLine(W.Text(page, "GameFontDisableSmall", nil, "LEFT"))
+    page.note:SetPoint("BOTTOMLEFT", page.list.frame, "BOTTOMLEFT", 0, -20)
+    page.note:SetPoint("RIGHT", 0, 0)
 end
 
 ---------------------------------------------------------------------------
@@ -324,24 +371,13 @@ local function updateItemBox(page)
     page.itemSub:SetText(sub)
 end
 
-function T.Update(page)
-    T.add = T.add or ns.SimMath.Empty()
-    local db = ns.db()
-    local metric = METRICS[T.metric]
-    page.metric:SetText("Show: " .. metric.name)
-    if page.mentalDex.SetChecked then page.mentalDex:SetChecked(db.simMentalDex and true or false) end
-    for key, row in pairs(page.sliders) do row:Set(T.add[key] or 0, false) end
-    updateItemBox(page)
+---------------------------------------------------------------------------
+-- View: Spells
+---------------------------------------------------------------------------
 
-    local p = ns.Profile.Player()
-    local mqRank, mqFrom = ns.SimMath.MentalQuickRank()
-    page.mentalQuick:SetText(("Mental Quickness: %d point%s (%s)"):format(mqRank, mqRank == 1 and "" or "s",
-        mqFrom == "talents" and "read from talents" or mqFrom == "setting" and "set by you" or "click to set"))
-    local q, why = ns.SimMath.Apply(p, T.add, { mentalDex = db.simMentalDex, mentalQuick = mqRank, weapon = T.item and T.item.weapon })
+local function spellRows(p, q, why, metric)
     local rows = {}
     local dec = metric.decimals
-
-    rows[#rows + 1] = { header = "Your spells (highest rank you have)" }
     for _, key in ipairs(SPELL_KEYS) do
         local spell = ns.RANKS_BY_KEY[key]
         local rank = spell and ns.SpellData.Best(key, p.level)
@@ -403,14 +439,199 @@ function T.Update(page)
                     end
                 end
                 addWhy(tt, why)
-                W.AddNote(tt, "Weapon buffs are on the Weapon Buffs tab. 🔶 Classic rules: 14 attack power = 1 DPS, 5% miss, 5% dodge.")
+                W.AddNote(tt, "Weapon buffs are in the Weapon buff view. 🔶 Classic rules: 14 attack power = 1 DPS, 5% miss, 5% dodge.")
+            end,
+        }
+    end
+    return rows
+end
+
+---------------------------------------------------------------------------
+-- View: Weapon buff
+---------------------------------------------------------------------------
+
+local function dpsOf(list, key)
+    for _, e in ipairs(list) do
+        if e.key == key then return e.calc and e.calc.dps end
+    end
+end
+
+-- The best buff in a list, and how far ahead of the next one it is.
+local function bestOf(list)
+    local b = list[1]
+    if not (b and b.calc) then return nil end
+    return b
+end
+
+-- How much MORE of one stat (on top of the sliders) makes buff "key" the
+-- best? Tries amounts between 0 and maxAmount and halves the gap each time
+-- (like guessing a number with "higher / lower"). Returns the amount, or
+-- nil if even maxAmount isn't enough.
+local function crossover(p, add, opts, key, stat, maxAmount)
+    local IM = ns.ImbueMath
+    local function lead(amount)
+        local a = {}
+        for k, v in pairs(add) do a[k] = v end
+        a[stat] = (a[stat] or 0) + amount
+        local q = ns.SimMath.Apply(p, a, opts)
+        local list = IM.Compare(q)
+        local mine, other = nil, nil
+        for _, e in ipairs(list) do
+            if e.calc then
+                if e.key == key then mine = e.calc.dps
+                elseif not other or e.calc.dps > other then other = e.calc.dps end
+            end
+        end
+        if not mine then return nil end
+        return mine - (other or 0)
+    end
+    local top = lead(maxAmount)
+    if not top or top < 0 then return nil end
+    local lo, hi = 0, maxAmount
+    while hi - lo > 1 do
+        local mid = math.floor((lo + hi) / 2)
+        local l = lead(mid)
+        if l and l >= 0 then hi = mid else lo = mid end
+    end
+    return hi
+end
+
+-- Stats that can change which buff wins, and the buff each one helps most.
+local TURNING_POINTS = {
+    { key = "FT", stat = "sp", unit = "spell power", max = 1500,
+      why = "Flametongue's fire gets stronger with spell power (your SP Test result, or the setting below)." },
+    { key = "WF", stat = "ap", unit = "attack power", max = 3000,
+      why = "Windfury's extra attacks get stronger with attack power. Rockbiter's bonus stays the same." },
+}
+
+local function weaponRows(p, q, why, opts)
+    local IM = ns.ImbueMath
+    local rows = {}
+    if not (q.weapon and q.weapon.min and q.weapon.speed) then
+        rows[#rows + 1] = { header = "No main-hand weapon found" }
+        return rows
+    end
+    local now, try = IM.Compare(p), IM.Compare(q)
+    local ctx = IM.lastCtx   -- from the "try" run
+    local bNow, bTry = bestOf(now), bestOf(try)
+
+    -- The answer first.
+    rows[#rows + 1] = { header = "The best weapon buff" }
+    if bTry then
+        local changed = bNow and bNow.key ~= bTry.key
+        local nowDps = bNow and dpsOf(now, bNow.key)
+        local ch, chCol = change(nowDps, bTry.calc.dps, 1)
+        rows[#rows + 1] = {
+            icon = bTry.rank and bTry.rank.icon, badge = true,
+            name = (changed and "New best: " or "Best: ") .. bTry.name, nameColor = W.GREEN,
+            sub = changed and ("|cffffd100Your changes make it beat " .. bNow.name .. ".|r")
+                or "Same as now. Move a slider to test.",
+            cols = { nowDps and ("+" .. f(nowDps, 1)) or "-", "+" .. f(bTry.calc.dps, 1), changed and "new!" or ch },
+            colColors = { W.GREY, W.GREEN, changed and W.GREEN or chCol },
+            tooltip = function(tt)
+                tt:AddLine("Best weapon buff with your changes", 1, 1, 1)
+                if bNow then tt:AddDoubleLine("Now", bNow.name .. " +" .. f(bNow.calc.dps, 1) .. " DPS", 1, 0.82, 0, 1, 1, 1) end
+                tt:AddDoubleLine("With your changes", bTry.name .. " +" .. f(bTry.calc.dps, 1) .. " DPS", 1, 0.82, 0, 0.12, 1, 0)
+                addWhy(tt, why)
+                W.AddNote(tt, "Same math as the Weapon Buffs tab: your weapon swung many times with each buff, using your attack power, crit, spell power and hit.")
             end,
         }
     end
 
-    -- Your stats, now and with the changes.
-    -- Stat weight: 1 spell power vs 1 Strength, from your SP Test results.
-    rows[#rows + 1] = { header = "1 spell power is worth (your SP Tests)" }
+    -- Every buff, now and with the changes.
+    rows[#rows + 1] = { header = "DPS each buff adds" }
+    for _, e in ipairs(try) do
+        local c = e.calc
+        local nowDps = dpsOf(now, e.key)
+        local ch, chCol = change(nowDps, c and c.dps, 1)
+        local sub = e.rank and ("Rank " .. e.rank.rank) or "Not learned yet"
+        if not c then sub = sub .. " · |cffff8000" .. (e.reason or "?") .. "|r"
+        elseif e.key == "WF" and ctx and ctx.ftTotem then sub = sub .. " · extra attacks get totem fire too"
+        elseif e.key == "FT" then sub = sub .. " · uses spell crit" end
+        rows[#rows + 1] = {
+            icon = e.rank and e.rank.icon, name = e.name, sub = sub, dim = not c,
+            badge = bTry and e == bTry,
+            nameColor = (bTry and e == bTry) and W.GREEN or nil,
+            cols = { nowDps and ("+" .. f(nowDps, 1)) or "-", c and ("+" .. f(c.dps, 1)) or "-", c and ch or "" },
+            colColors = { W.GREY, W.WHITE, chCol },
+            tooltip = function(tt)
+                tt:AddLine(e.name .. (e.rank and ("  (Rank " .. e.rank.rank .. ")") or ""), 1, 1, 1)
+                if not c then
+                    tt:AddLine("Can't calculate: " .. (e.reason or "?"), 1, 0.3, 0.2, true)
+                    return
+                end
+                tt:AddDoubleLine("Now", nowDps and ("+" .. f(nowDps, 1) .. " DPS") or "-", 1, 0.82, 0, 1, 1, 1)
+                tt:AddDoubleLine("With your changes", "+" .. f(c.dps, 1) .. " DPS", 1, 0.82, 0, 0.12, 1, 0)
+                tt:AddLine(" ")
+                W.AddMath(tt, c.lines)
+                if e.key == "WF" then
+                    W.AddNote(tt, "Each Windfury extra attack is a full hit, so anything that adds damage to every hit (like Flametongue Totem) is added to the extra attacks too. Turn Flametongue Totem on below to see it.")
+                elseif e.key == "FT" then
+                    W.AddNote(tt, "Flametongue's fire uses your spell crit (from Intellect), not melee crit. Only one weapon buff fits on a weapon, so Flametongue Weapon and Windfury Weapon can't both be on your main hand.")
+                end
+                addWhy(tt, why)
+            end,
+        }
+    end
+
+    -- When would a different buff win?
+    rows[#rows + 1] = { header = "What would change the best buff" }
+    for _, tp in ipairs(TURNING_POINTS) do
+        local e
+        for _, x in ipairs(try) do if x.key == tp.key then e = x end end
+        if e and e.calc then
+            local isBest = bTry and bTry.key == tp.key
+            local row = { icon = e.rank and e.rank.icon, name = e.name, cols = { "", "", "" }, colColors = { W.GREY, W.WHITE, W.GREEN } }
+            if isBest then
+                row.sub = "Already the best with your changes."
+                row.cols[3] = "best"
+            else
+                local need = crossover(p, T.add, opts, tp.key, tp.stat, tp.max)
+                if need then
+                    row.sub = ("Beats %s with %s more %s"):format(bTry.name, f(need), tp.unit)
+                    row.cols[3] = "+" .. f(need)
+                else
+                    -- Doesn't get there even with a huge amount.
+                    row.sub = ("Not even with +%s %s"):format(f(tp.max), tp.unit)
+                    if tp.key == "FT" then row.sub = row.sub .. " (check its spell power share)" end
+                    row.cols[3] = "never"
+                    row.colColors[3] = W.GREY
+                end
+            end
+            row.tooltip = function(tt)
+                tt:AddLine(e.name, 1, 1, 1)
+                tt:AddLine(tp.why, 1, 0.82, 0, true)
+                tt:AddLine("The number is how much MORE " .. tp.unit .. " you'd need on top of what the sliders already add.", 0.6, 0.6, 0.6, true)
+                if tp.key == "FT" then
+                    tt:AddLine(" ")
+                    tt:AddDoubleLine("Fire spell power (with changes)", f(q.sp and q.sp.Fire or 0), 1, 0.82, 0, 1, 1, 1)
+                end
+            end
+            rows[#rows + 1] = row
+        end
+    end
+
+    -- Group settings (same ones as the Weapon Buffs tab), so you can see
+    -- what a Flametongue or Windfury Totem in the group does.
+    for _, r in ipairs(ns.ImbueSettingRows(p)) do
+        if r.header then
+            r.header = "Your group (click a row to change it)"
+        elseif r.cols then
+            r.cols = { "", "", r.cols[2] }
+            r.colColors = { nil, nil, r.colColors and r.colColors[2] }
+        end
+        rows[#rows + 1] = r
+    end
+    return rows
+end
+
+---------------------------------------------------------------------------
+-- View: Stat value (what 1 point is worth)
+---------------------------------------------------------------------------
+
+local function worthRows(p, mqRank)
+    local db = ns.db()
+    local rows = { { header = "1 spell power is worth (your SP Tests)" } }
     local strDps = ns.CoefTest.StrengthDps(p)
     local weights = ns.CoefTest.Weights(p)
     for _, w in ipairs(weights) do
@@ -439,6 +660,7 @@ function T.Update(page)
     end
     -- 1 Intellect: spell power (Mental Quickness) + attack power (Mental Dexterity).
     local int = ns.CoefTest.IntellectValue(p, { mentalDex = db.simMentalDex, mentalQuick = mqRank }, weights)
+    rows[#rows + 1] = { header = "Compare with" }
     if int then
         rows[#rows + 1] = {
             icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", name = "1 Intellect (compare)",
@@ -464,17 +686,25 @@ function T.Update(page)
             sub = "Melee swing DPS from +2 attack power", cols = { "", f(strDps, 3), "1 Str" },
             colColors = { W.GREY, W.WHITE, W.GREY } }
     end
+    return rows
+end
 
-    rows[#rows + 1] = { header = "Your stats" }
-    local STAT_ROWS = {
-        { "Attack Power", "ap", 0, "Interface\\Icons\\Ability_Warrior_BattleShout" },
-        { "Spell Power", function(x) return x.sp and x.sp.Nature end, 0, "Interface\\Icons\\Spell_Nature_StarFall" },
-        { "Healing", "healing", 0, "Interface\\Icons\\Spell_Nature_HealingTouch" },
-        { "Spell Crit", "spellCrit", 2, "Interface\\Icons\\Spell_Fire_FlameBolt", "%" },
-        { "Melee Crit", "meleeCrit", 2, "Interface\\Icons\\Ability_CriticalStrike", "%" },
-        { "Hit", "spellHit", 0, "Interface\\Icons\\Ability_Marksmanship", "%" },
-        { "Max Mana", "mana", 0, "Interface\\Icons\\Spell_Shadow_ManaBurn" },
-    }
+---------------------------------------------------------------------------
+-- View: My stats
+---------------------------------------------------------------------------
+
+local STAT_ROWS = {
+    { "Attack Power", "ap", 0, "Interface\\Icons\\Ability_Warrior_BattleShout" },
+    { "Spell Power", function(x) return x.sp and x.sp.Nature end, 0, "Interface\\Icons\\Spell_Nature_StarFall" },
+    { "Healing", "healing", 0, "Interface\\Icons\\Spell_Nature_HealingTouch" },
+    { "Spell Crit", "spellCrit", 2, "Interface\\Icons\\Spell_Fire_FlameBolt", "%" },
+    { "Melee Crit", "meleeCrit", 2, "Interface\\Icons\\Ability_CriticalStrike", "%" },
+    { "Hit", "spellHit", 0, "Interface\\Icons\\Ability_Marksmanship", "%" },
+    { "Max Mana", "mana", 0, "Interface\\Icons\\Spell_Shadow_ManaBurn" },
+}
+
+local function statRows(p, q, why)
+    local rows = {}
     for _, s in ipairs(STAT_ROWS) do
         local get = type(s[2]) == "function" and s[2] or function(x) return x[s[2]] end
         local va, vb = get(p) or 0, get(q) or 0
@@ -491,6 +721,52 @@ function T.Update(page)
                 addWhy(tt, why)
             end,
         }
+    end
+    return rows
+end
+
+---------------------------------------------------------------------------
+-- Update
+---------------------------------------------------------------------------
+
+function T.Update(page)
+    T.add = T.add or ns.SimMath.Empty()
+    local db = ns.db()
+    local metric = METRICS[T.metric]
+    local viewId = T.View()
+    local view = VIEW_BY_ID[viewId]
+
+    -- The picked view's button stays lit.
+    for id, b in pairs(page.viewButtons) do
+        if id == viewId then b:LockHighlight() else b:UnlockHighlight() end
+    end
+    page.list:SetNameTitle(view.title)
+    page.list:SetColumnTitles(view.cols)
+    page.note:SetText(view.note)
+    page.metric:SetShown(viewId == "spells")
+    page.note:SetPoint("RIGHT", viewId == "spells" and -158 or 0, 0)
+    page.metric:SetText("Show: " .. metric.name)
+
+    if page.mentalDex.SetChecked then page.mentalDex:SetChecked(db.simMentalDex and true or false) end
+    for key, row in pairs(page.sliders) do row:Set(T.add[key] or 0, false) end
+    updateItemBox(page)
+
+    local p = ns.Profile.Player()
+    local mqRank, mqFrom = ns.SimMath.MentalQuickRank()
+    page.mentalQuick:SetText(("Mental Quickness: %d point%s (%s)"):format(mqRank, mqRank == 1 and "" or "s",
+        mqFrom == "talents" and "read from talents" or mqFrom == "setting" and "set by you" or "click to set"))
+    local opts = { mentalDex = db.simMentalDex, mentalQuick = mqRank, weapon = T.item and T.item.weapon }
+    local q, why = ns.SimMath.Apply(p, T.add, opts)
+
+    local rows
+    if viewId == "weapon" then
+        rows = weaponRows(p, q, why, opts)
+    elseif viewId == "worth" then
+        rows = worthRows(p, mqRank)
+    elseif viewId == "stats" then
+        rows = statRows(p, q, why)
+    else
+        rows = spellRows(p, q, why, metric)
     end
     page.list:SetRows(rows)
 end

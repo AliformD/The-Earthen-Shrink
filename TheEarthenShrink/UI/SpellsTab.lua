@@ -46,8 +46,18 @@ function T.Build(page)
 
     page.note = W.Text(page, "GameFontDisableSmall", nil, "LEFT")
     page.note:SetPoint("BOTTOMLEFT", 0, 4)
-    page.note:SetPoint("RIGHT", -320, 0)
-    page.note:SetText("Tick = best per mana. Grey = low rank, too little DPS to use.")
+    page.note:SetPoint("RIGHT", -434, 0)
+    W.OneLine(page.note)
+    page.note:SetText("Tick = best per mana. Grey = low rank.")
+
+    -- Folds or opens every spell at once.
+    page.fold = W.Button(page, "Collapse all", 110)
+    page.fold:SetPoint("BOTTOMRIGHT", -316, 0)
+    page.fold:SetScript("OnClick", function()
+        local groups = page.groups or {}
+        W.FoldAll("spells", groups, W.AnyOpen("spells", groups))
+        T.Update(page)
+    end)
 
     page.sort = W.Button(page, "Sort: by spell", 150)
     page.sort:SetPoint("BOTTOMRIGHT", -158, 0)
@@ -193,14 +203,22 @@ function T.Update(page)
         rows[1] = { header = "All damage spells, most damage per mana first" }
         for _, e in ipairs(entries) do rows[#rows + 1] = makeRow(e, p, best, maxDpm, refDmg) end
     else
-        local lastKey
+        -- One group per spell. Click a spell's title to fold its ranks away.
+        local groups, byKey = {}, {}
         for _, e in ipairs(entries) do
-            if e.spell.key ~= lastKey then
-                rows[#rows + 1] = { header = e.spell.name, headerIcon = e.rank.icon }
-                lastKey = e.spell.key
+            local g = byKey[e.spell.key]
+            if not g then
+                g = { key = e.spell.key, name = e.spell.name, icon = e.rank.icon, rows = {} }
+                byKey[e.spell.key] = g
+                groups[#groups + 1] = g
             end
-            rows[#rows + 1] = makeRow(e, p, best, maxDpm, refDmg)
+            g.rows[#g.rows + 1] = makeRow(e, p, best, maxDpm, refDmg)
+            if e == best then g.best = true end
         end
+        page.groups = groups
+        rows = W.FoldedRows("spells", groups, function() T.Update(page) end)
     end
+    page.fold:SetShown(not T.sortByDpm and #entries > 0)
+    page.fold:SetText(W.AnyOpen("spells", page.groups or {}) and "Collapse all" or "Expand all")
     page.list:SetRows(rows)
 end

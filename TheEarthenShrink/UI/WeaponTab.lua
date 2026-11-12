@@ -133,9 +133,13 @@ function ns.ImbueSettingRows(p)
         end,
     }
     local coef = set.ftCoef or 0
+    -- A saved SP Test result for Flametongue Weapon wins over this setting.
+    local ftRank = ns.SpellData.Best("FT", p.level or 1)
+    local tested = ftRank and ns.CoefTest and ns.CoefTest.Saved("FT", ftRank.rank).proc
     rows[#rows + 1] = {
         icon = 135814, name = "Flametongue spell power bonus",
-        sub = "|cffff8000Unverified|r · share of your Fire spell power added to each Flametongue hit",
+        sub = tested and ("|cff1eff00Using your SP Test: %s per spell power|r · this setting is not used"):format(f(tested.coef or 0, 2))
+            or "|cffff8000Unverified|r · share of your Fire spell power added to each Flametongue hit",
         cols = { "", f(coef * 100, 0) .. "%" },
         colColors = { nil, coef > 0 and W.ORANGE or W.GREY },
         onClick = function() IM.CycleFtCoef() end,
@@ -158,7 +162,7 @@ local STAT_INFO = {
     mcrit  = { icon = "Interface\\Icons\\Ability_CriticalStrike", tip = "Melee crit chance. Makes Rockbiter and Windfury hits crit more often." },
     scrit  = { icon = "Interface\\Icons\\Spell_Nature_StormReach", tip = "Spell crit chance. Flametongue's fire damage uses this one." },
     hit    = { icon = "Interface\\Icons\\Ability_Marksmanship", tip = "Hit from gear lowers your miss chance. Every buff here only works on hits that land." },
-    sp     = { icon = "Interface\\Icons\\Spell_Nature_Lightning", tip = "Nature spell power. Used by Lightning Bolt, Earth Shock and Lightning Shield, not by weapon buffs." },
+    sp     = { icon = "Interface\\Icons\\Spell_Nature_Lightning", tip = "Spell power. Used by your spells, and by Flametongue's fire if your SP Test (or the setting) says it scales. For another player it's the spell power on their gear, plus Mental Quickness if their talents can be read." },
     mana   = { icon = "Interface\\Icons\\INV_Potion_76", tip = "Your mana pool. The Spell Efficiency tab uses it for '% of mana' and 'casts per mana bar'." },
 }
 
@@ -188,7 +192,14 @@ function ns.ProfileRows(p)
     add("mcrit", "Melee crit", f(p.meleeCrit or 0, 2) .. "%", "meleeCrit")
     add("scrit", "Spell crit", f(p.spellCrit or 0, 2) .. "%", "spellCrit")
     add("hit", "Hit from gear", f(p.hit or 0) .. "%")
-    add("sp", "Spell power (Nature)", f(p.sp and p.sp.Nature or 0))
+    add("sp", "Spell power", f(p.sp and p.sp.Nature or 0), "sp")
+    if p.source == "inspect" then
+        local r = rows[#rows]
+        r.sub = p.mentalQuick == nil and "|cffff8000from gear only|r · couldn't read their talents"
+            or (p.mentalQuick > 0 and ("|cffff8000estimate|r · %s from gear + %s from Intellect (Mental Quickness %d)"):format(
+                f(p.spFromGear or 0), f(p.spFromInt or 0, 1), p.mentalQuick)
+            or "|cff1eff00from gear|r · no Mental Quickness")
+    end
     add("mana", "Max mana", f(p.mana or 0), "mana")
     return rows
 end

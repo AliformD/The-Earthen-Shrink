@@ -135,6 +135,13 @@ C_Item.GetItemIconByID = function() return 133000 end
 C_Item.GetItemStats = function() return {} end
 C_TooltipInfo.GetHyperlink = function(link) local id = link:match("item:(%d+)"); return ITEMS[id] and { lines = ITEMS[id].lines } end
 
+-- Fake minimap: 140 wide, centre at (1000, 700), scale 1.
+Minimap = newObj("Frame")
+Minimap.GetWidth = function() return 140 end
+Minimap.GetCenter = function() return 1000, 700 end
+Minimap.GetEffectiveScale = function() return 1 end
+MOUSE = { 1000, 800 }
+function GetCursorPosition() return MOUSE[1], MOUSE[2] end
 local ns = {}
 for line in io.lines(ADDON_DIR .. "/TheEarthenShrink.toc") do
   if not line:match("^##") and line:match("%S") then
@@ -166,6 +173,24 @@ end
 dump("weapon")
 SlashCmdList.THEEARTHENSHRINK("spells")
 dump("spells")
+-- Fold up Lightning Bolt: its rank rows go away, the title stays
+do
+  local sp = TheEarthenShrinkFrame.pages.spells
+  local function count(name)
+    local n = 0
+    for _, r in ipairs(sp.list.rows) do if r._shown and r.data.name == name then n = n + 1 end end
+    return n
+  end
+  local before = count("Lightning Bolt")
+  for _, r in ipairs(sp.list.rows) do if r._shown and r.data.header == "Lightning Bolt" then r._scripts.OnClick(r) end end
+  print("Lightning Bolt rows:", before, "->", count("Lightning Bolt"))
+  assert(before > 0 and count("Lightning Bolt") == 0 and ns.db().collapsed.spells.LB)
+  sp.fold._scripts.OnClick()   -- some open: collapse all
+  assert(count("Earth Shock") == 0)
+  sp.fold._scripts.OnClick()   -- all folded: expand all
+  assert(count("Lightning Bolt") == before and not ns.db().collapsed.spells.LB)
+  print("fold tests passed")
+end
 TheEarthenShrinkFrame.pages.spells.sort._scripts.OnClick()
 dump("spells")
 SlashCmdList.THEEARTHENSHRINK("inspect")
@@ -190,6 +215,24 @@ C_TooltipInfo.GetTrainerService = function(i) return { id = 99001 } end
 fire("TRAINER_SHOW"); runTimers(); runTimers()
 SlashCmdList.THEEARTHENSHRINK("spells")
 dump("spells")
+-- Fold up Lightning Bolt: its rank rows go away, the title stays
+do
+  local sp = TheEarthenShrinkFrame.pages.spells
+  local function count(name)
+    local n = 0
+    for _, r in ipairs(sp.list.rows) do if r._shown and r.data.name == name then n = n + 1 end end
+    return n
+  end
+  local before = count("Lightning Bolt")
+  for _, r in ipairs(sp.list.rows) do if r._shown and r.data.header == "Lightning Bolt" then r._scripts.OnClick(r) end end
+  print("Lightning Bolt rows:", before, "->", count("Lightning Bolt"))
+  assert(before > 0 and count("Lightning Bolt") == 0 and ns.db().collapsed.spells.LB)
+  sp.fold._scripts.OnClick()   -- some open: collapse all
+  assert(count("Earth Shock") == 0)
+  sp.fold._scripts.OnClick()   -- all folded: expand all
+  assert(count("Lightning Bolt") == before and not ns.db().collapsed.spells.LB)
+  print("fold tests passed")
+end
 -- Sim Lab
 SlashCmdList.THEEARTHENSHRINK("sim")
 local sim = TheEarthenShrinkFrame.pages.simlab
@@ -237,6 +280,32 @@ dumpSim("a bag")
 sim.mentalDex:SetChecked(true); ns.db().simMentalDex = true
 sim.clear._scripts.OnClick()
 dumpSim("cleared")
+-- Weapon buff view: does a lot of spell power make Flametongue the best?
+ns.Tabs.simlab.SetView("weapon")
+SlashCmdList.THEEARTHENSHRINK("ftcoef 0.5")
+dumpSim("weapon view, ftcoef 0.5")
+local function bestRow()
+  for _, r in ipairs(sim.list.rows) do if r._shown and r.data.name and (r.data.name:find("^New best: ") or r.data.name:find("^Best: ")) then return r.data.name end end
+end
+print("best:", bestRow())
+local need
+for _, r in ipairs(sim.list.rows) do
+  if r._shown and r.data.name == "Flametongue Weapon" and r.sub._text:find("Beats") then need = tonumber((r.cols[3]._text:gsub("[+,]", ""))) end
+end
+print("Flametongue needs +", need, "spell power")
+assert(need and need > 0, "should say how much spell power Flametongue needs")
+sim.sliders.sp:Set(math.min(150, need + 1), true)
+dumpSim("weapon view, + spell power")
+if need + 1 <= 150 then assert(bestRow():find("Flametongue"), "Flametongue should be best now") end
+-- Flametongue Totem in group: Windfury's extra attacks get the totem fire
+SlashCmdList.THEEARTHENSHRINK("fttotem on")
+dumpSim("weapon view, Flametongue Totem on")
+SlashCmdList.THEEARTHENSHRINK("fttotem off")
+SlashCmdList.THEEARTHENSHRINK("ftcoef 0")
+sim.clear._scripts.OnClick()
+ns.Tabs.simlab.SetView("stats")
+dumpSim("stats view")
+ns.Tabs.simlab.SetView("worth")
 -- Window closed: shift-clicks are ignored
 TheEarthenShrinkFrame:Hide()
 for _, fn in ipairs(HOOKS.ChatEdit_InsertLink) do fn("|Hitem:3|h[Thinking Cap]|h") end
@@ -326,7 +395,7 @@ local CT = ns.CoefTest
 local function dumpCoef(title)
   print("=== sp test: " .. title)
   for _, r in ipairs(ct.list.rows) do
-    if r._shown then print(r.data.header and ("-- " .. r.data.header) or (r.name._text .. " | " .. r.sub._text .. " | " .. tostring(r.cols[1]._text) .. (r.data.selected and "  <selected>" or ""))) end
+    if r._shown then print(r.data.header and ("-- " .. r.data.header) or (r.name._text .. " | " .. r.sub._text .. " | " .. tostring(r.subRight._text) .. (r.data.selected and "  <selected>" or ""))) end
   end
   print("BEFORE: " .. ct.before.body._text:gsub("\n", " / ") .. "  [" .. ct.before.state._text .. "]")
   print("AFTER:  " .. ct.after.body._text:gsub("\n", " / ") .. "  [" .. ct.after.state._text .. "]")
@@ -559,3 +628,21 @@ assert(#ch == 1 and ch[1].label == "Stormstrike rank 1 tooltip")
 assert(#ns.GameCheck.Check(true) == 0, "reported once")
 SlashCmdList.THEEARTHENSHRINK("changes")
 print("hotfix check tests passed")
+
+-- Minimap button: click toggles the window, drag saves the angle, hide/show
+local mb = TheEarthenShrinkMinimapButton
+assert(mb, "minimap button made")
+local win = TheEarthenShrinkFrame
+win:Hide()
+mb._scripts.OnClick(mb, "LeftButton"); assert(win:IsShown(), "left-click opens")
+mb._scripts.OnClick(mb, "LeftButton"); assert(not win:IsShown(), "left-click closes")
+mb._scripts.OnDragStart(mb); mb._scripts.OnUpdate(mb); mb._scripts.OnDragStop(mb)
+assert(math.abs(ns.db().minimap.angle - 90) < 0.01, "dragged to top = 90 degrees")
+mb._scripts.OnClick(mb, "RightButton"); assert(TheEarthenShrinkMinimapMenu:IsShown(), "right-click menu")
+ns.db().minimap.lock = true; MOUSE = { 900, 700 }
+mb._scripts.OnDragStart(mb); assert(mb._scripts.OnUpdate == nil or ns.db().minimap.angle == 90, "locked")
+SlashCmdList.THEEARTHENSHRINK("minimap"); assert(not mb:IsShown() and ns.db().minimap.hide)
+SlashCmdList.THEEARTHENSHRINK("minimap"); assert(mb:IsShown() and not ns.db().minimap.hide)
+SlashCmdList.THEEARTHENSHRINK("minimap reset"); assert(ns.db().minimap.angle == 200 and not ns.db().minimap.lock)
+TheEarthenShrink_OnCompartmentClick("TheEarthenShrink", "LeftButton"); assert(win:IsShown(), "compartment opens")
+print("minimap button tests passed")

@@ -33,8 +33,16 @@ function T.Build(page)
     page.list:SetNameTitle("Heal")
     page.note = W.Text(page, "GameFontDisableSmall", nil, "LEFT")
     page.note:SetPoint("BOTTOMLEFT", 0, 4)
-    page.note:SetPoint("RIGHT", -170, 0)
-    page.note:SetText("Tick = most healing per mana. Grey = low rank, heals too slowly to use.")
+    page.note:SetPoint("RIGHT", -276, 0)
+    W.OneLine(page.note)
+    page.note:SetText("Tick = most healing per mana. Grey = low rank.")
+    page.fold = W.Button(page, "Collapse all", 110)
+    page.fold:SetPoint("BOTTOMRIGHT", -158, 0)
+    page.fold:SetScript("OnClick", function()
+        local groups = page.groups or {}
+        W.FoldAll("healing", groups, W.AnyOpen("healing", groups))
+        T.Update(page)
+    end)
     page.future = W.Button(page, "Show higher ranks", 150)
     page.future:SetPoint("BOTTOMRIGHT", 0, 0)
     page.future:SetScript("OnClick", function()
@@ -130,14 +138,22 @@ function T.Update(page)
         best and W.GREEN or nil)
     page.chips[3]:Set("Fastest healing", bestHps and (bestHps.spell.name .. " R" .. bestHps.rank.rank .. ": " .. f(bestHps.c.hps, 1) .. "/s") or "-")
 
-    local rows, lastKey = {}, nil
-    if #entries == 0 then rows[1] = { header = "No healing spells found yet. Wait a few seconds, or type /es check" } end
+    -- One group per heal. Click a heal's title to fold its ranks away.
+    local groups, byKey = {}, {}
     for _, e in ipairs(entries) do
-        if e.spell.key ~= lastKey then
-            rows[#rows + 1] = { header = e.spell.name, headerIcon = e.rank.icon }
-            lastKey = e.spell.key
+        local g = byKey[e.spell.key]
+        if not g then
+            g = { key = e.spell.key, name = e.spell.name, icon = e.rank.icon, rows = {} }
+            byKey[e.spell.key] = g
+            groups[#groups + 1] = g
         end
-        rows[#rows + 1] = makeRow(e, p, best, maxHpm)
+        g.rows[#g.rows + 1] = makeRow(e, p, best, maxHpm)
+        if e == best then g.best = true end
     end
+    page.groups = groups
+    local rows = W.FoldedRows("healing", groups, function() T.Update(page) end)
+    if #entries == 0 then rows[1] = { header = "No healing spells found yet. Wait a few seconds, or type /es check" } end
+    page.fold:SetShown(#entries > 0)
+    page.fold:SetText(W.AnyOpen("healing", groups) and "Collapse all" or "Expand all")
     page.list:SetRows(rows)
 end
