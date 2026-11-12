@@ -830,3 +830,66 @@ print("chat (ft coef):", m4, #m4)
 assert(#m4 <= 255)
 ns.db().ftCoef = 0
 print("chat message tests passed")
+
+-- Totem timer ------------------------------------------------------------------
+-- All numbers are MADE UP (fake tooltip: Mana Spring R1 = 40 mana, 4 mana every
+-- 2 sec). The fake game timer says it lasts 22 sec.
+local TT = ns.TotemTracker
+TT.Clear()
+FAKE_TIME = 100
+FAKE_MANA = 1000
+function UnitPower() return FAKE_MANA end
+TOTEMS = {}
+function GetTotemInfo(slot) local t = TOTEMS[slot]; if t then return true, t.name, t.start, t.dur, 136053 end; return false, "", 0, 0 end
+C_Spell.GetSpellName = function(id) return ({ [5675] = "Mana Spring Totem", [8071] = "Stoneskin Totem", [25584] = "Windfury Attack" })[id] end
+local function step(sec) -- move time forward in 0.1 sec steps
+  for _ = 1, math.floor(sec * 10 + 0.5) do FAKE_TIME = FAKE_TIME + 0.1; local fn = TT.ticker._scripts.OnUpdate; if fn then fn(TT.ticker, 0.1) end end
+end
+local function drop(slot, id, name)
+  fire("UNIT_SPELLCAST_SUCCEEDED", "player", "c", id)
+  TOTEMS[slot] = { name = name, start = FAKE_TIME, dur = 22 }
+  fire("PLAYER_TOTEM_UPDATE", slot)
+end
+local function tick(n) FAKE_MANA = FAKE_MANA + (n or 4); fire("UNIT_POWER_UPDATE", "player", "MANA") end
+SlashCmdList.THEEARTHENSHRINK("totems")
+-- Drop 1: stays the full 22 sec, you get all 11 ticks -> paid off
+drop(3, 5675, "Mana Spring Totem")
+local rec = TT.Active("Water")
+assert(rec and rec.duration == 22 and rec.durationFrom == "game timer" and rec.payoffTicks == 10 and rec.payoffSec == 20, "drop 1 started")
+for i = 1, 11 do step(2); tick() end
+FAKE_MANA = FAKE_MANA + 7; fire("UNIT_POWER_UPDATE", "player", "MANA")  -- normal regen: not a tick
+step(0.6)
+assert(not TT.Active("Water"), "ran out")
+-- Drop 2: you walk away after 3 ticks; it stays down the full time
+drop(3, 5675, "Mana Spring Totem")
+for i = 1, 3 do step(2); tick() end
+step(17)
+-- Drop 3: replaced by a new Mana Spring after 8 sec
+drop(3, 5675, "Mana Spring Totem")
+for i = 1, 4 do step(2); tick() end
+drop(3, 5675, "Mana Spring Totem")
+-- Drop 4: the totem gets killed after 5 sec (slot goes empty)
+step(5); TOTEMS[3] = nil; fire("PLAYER_TOTEM_UPDATE", 3)
+-- An earth totem the game timer tells us about before the cast does
+TOTEMS[2] = { name = "Stoneskin Totem", start = FAKE_TIME, dur = 120 }
+fire("PLAYER_TOTEM_UPDATE", 2)
+fire("UNIT_SPELLCAST_SUCCEEDED", "player", "c", 8071)
+step(1)
+assert(TT.Active("Earth").how == "totem timer + your cast", "not started twice")
+local s = TT.Summary("MST")
+print("totem log:", TT.ShortLine("MST"))
+for _, l in ipairs(TT.TooltipLines("MST")) do print("   ", type(l) == "table" and (l[1] .. " = " .. l[2]) or l) end
+assert(s.n == 4 and s.full == 2, "4 drops, 2 ran full time")
+assert(s.reasons.replaced == 1 and s.reasons.gone == 1)
+assert(s.paidTime == 2 and s.paidTicks == 1, "drop 2 stood long enough but you didn't get the ticks")
+assert(s.gained == 44 + 12 + 16 and s.spent == 160)
+ns.UI.Update()
+local tp = TheEarthenShrinkFrame.pages.totems
+print("live:", tp.bars[2].label._text, tp.bars[2].right._text, "|", tp.bars[3].label._text, "|", tp.logLine._text)
+assert(tp.logLine._text:find("4 drops"))
+dump("totems")
+SlashCmdList.THEEARTHENSHRINK("totemtest")
+SlashCmdList.THEEARTHENSHRINK("totemtest")
+SlashCmdList.THEEARTHENSHRINK("totemtest clear")
+assert(not TT.Summary("MST"))
+print("totem timer tests passed")

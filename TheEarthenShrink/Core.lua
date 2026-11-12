@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.11.1"
+ns.VERSION = "0.13.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -113,6 +113,9 @@ local DEFAULTS = {
     collapsed = {},
     -- Sim Lab: which view is open ("total", "weights", "spells", "weapon", "stats").
     simView = "total",
+    -- Totem timer log: totemLog.MST = the last 50 Mana Spring drops (how long
+    -- each stayed down, ticks seen, mana back). Clear with /es totemtest clear.
+    totemLog = {},
 }
 
 function ns.db()
@@ -213,11 +216,13 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.ImbueMath.Slash(msg)
     elseif msg == "minimap" or msg:match("^minimap%s") then
         ns.Minimap.Slash(msg:match("^minimap%s+(%a+)"))
+    elseif msg == "totemtest" or msg:match("^totemtest%s") then
+        ns.TotemTracker.Slash(msg:match("^totemtest%s+(%a+)"))
     elseif msg == "talents" then
         ns.TalentMods.Print()
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es changes, /es talents, /es inspect, /es check, /es minimap, /es minimap reset, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es fttotem on|off, /es ftstack on|off, /es ftcoef 0.1, /es swings 50")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es changes, /es talents, /es inspect, /es check, /es minimap, /es minimap reset, /es sound, /es sound test, /es totemtest, /es totemtest clear, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es fttotem on|off, /es ftstack on|off, /es ftcoef 0.1, /es swings 50")
     end
 end

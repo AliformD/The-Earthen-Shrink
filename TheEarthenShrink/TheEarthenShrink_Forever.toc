@@ -1,8 +1,8 @@
 ## Interface: 16001
 ## Title: The Earthen Shrink
-## Notes: Shaman helper: weapon buffs, spell damage per mana, totems, a Sim Lab to try stats and gear, a spell power test, and inspect. Type /es.
+## Notes: Shaman helper: weapon buffs, spell damage per mana, totems, a Sim Lab to try stats and gear, a spell power test, a totem timer, and inspect. Type /es.
 ## Author: The Earthen Shrink
-## Version: 0.12.1
+## Version: 0.13.0
 ## Category: Shaman
 ## IconTexture: Interface\Icons\Spell_Nature_Lightning
 ## AddonCompartmentFunc: TheEarthenShrink_OnCompartmentClick
@@ -25,6 +25,7 @@ Math/Rotation.lua
 Math/CoefTest.lua
 Chat.lua
 WindfuryAlert.lua
+TotemTracker.lua
 CoefTest.lua
 GameCheck.lua
 UI/Widgets.lua
