@@ -25,6 +25,7 @@ local TAB_ORDER = {
     { id = "healing", title = "Healing",      head = "Healing Per Mana", icon = "Interface\\Icons\\Spell_Nature_MagicImmunity" },
     { id = "totems",  title = "Totems",       head = "Totems",           icon = "Interface\\Icons\\Spell_Nature_ManaRegenTotem" },
     { id = "simlab",  title = "Sim Lab",      head = "Sim Lab",          icon = "Interface\\Icons\\INV_Misc_Gear_01" },
+    { id = "coef",    title = "SP Test",      head = "Spell Power Test", icon = "Interface\\Icons\\Trade_Alchemy" },
     { id = "inspect", title = "Inspect",      head = "Inspect",          icon = "Interface\\Icons\\INV_Misc_Spyglass_03" },
 }
 

@@ -315,3 +315,103 @@ print("Rockbiter on:", "WF", rb.WF.calc.dps, "RB", rb.RB.calc.dps)
 assert(math.abs(rb.WF.calc.dps - base.WF.calc.dps) < 0.01, "Rockbiter AP should be removed")
 C_TooltipInfo.GetInventoryItem, UnitAttackPower = oldTT, oldAP
 print("weapon buff tests passed")
+
+-- Spell Power Test tab ------------------------------------------------------
+-- All hit numbers here are MADE UP to check the math, not Forever data.
+FAKE_SP = 64
+function GetSpellBonusDamage(i) return FAKE_SP end
+SlashCmdList.THEEARTHENSHRINK("test")
+local ct = TheEarthenShrinkFrame.pages.coef
+local CT = ns.CoefTest
+local function dumpCoef(title)
+  print("=== sp test: " .. title)
+  for _, r in ipairs(ct.list.rows) do
+    if r._shown then print(r.data.header and ("-- " .. r.data.header) or (r.name._text .. " | " .. r.sub._text .. " | " .. tostring(r.cols[1]._text) .. (r.data.selected and "  <selected>" or ""))) end
+  end
+  print("BEFORE: " .. ct.before.body._text:gsub("\n", " / ") .. "  [" .. ct.before.state._text .. "]")
+  print("AFTER:  " .. ct.after.body._text:gsub("\n", " / ") .. "  [" .. ct.after.state._text .. "]")
+  print("label:  " .. ct.entryLabel._text)
+  print("msg:    " .. ct.msg._text)
+  print("big:    " .. ct.big._text .. "   " .. ct.verdict._text)
+  for l in (ct.body._text .. "\n"):gmatch("(.-)\n") do print("   | " .. l) end
+  print("saved:  " .. ct.saved._text)
+end
+dumpCoef("empty")
+-- pick Lightning Bolt
+local lbRow
+for _, r in ipairs(ct.list.rows) do if r._shown and r.data.name == "Lightning Bolt" then lbRow = r end end
+lbRow._scripts.OnClick(lbRow)
+local t = ns.Tabs.coef.target
+assert(t.spell.key == "LB" and t.part == "direct")
+-- Before: 20 hits spread evenly over the tooltip range
+ct.before._scripts.OnClick()
+local lo, hi = t.rank.dmg.min, t.rank.dmg.max
+local before = {}
+for i = 0, 19 do before[#before+1] = tostring(math.floor(lo + (hi - lo) * i / 19 + 0.5)) end
+ns.Tabs.coef.Submit(ct, table.concat(before, " "))
+ns.Tabs.coef.Submit(ct, "11")          -- typo: too small
+print("typo msg:", ct.msg._text)
+assert(#CT.Test(t).before.hits == 20)
+ns.Tabs.coef.Submit(ct, "5000")        -- crit / typo: too big
+print("crit msg:", ct.msg._text)
+assert(#CT.Test(t).before.hits == 20)
+dumpCoef("20 before hits")
+-- Gear changed but still on BEFORE: refused
+FAKE_SP = 84
+ns.Tabs.coef.Submit(ct, tostring(lo + 14))
+print("sp changed msg:", ct.msg._text)
+assert(#CT.Test(t).before.hits == 20)
+-- After: +20 SP, every hit 14 bigger (coefficient 0.7)
+ct.after._scripts.OnClick()
+local after = {}
+for _, v in ipairs(before) do after[#after+1] = tostring(tonumber(v) + 14) end
+ns.Tabs.coef.Submit(ct, table.concat(after, ", "))
+dumpCoef("20 after hits, +20 SP")
+local r = CT.Result(t)
+assert(math.abs(r.coef - 0.7) < 1e-9, "coef should be 0.7")
+assert(r.verdict == "rough", "20 hits each with +20 SP is too rough")
+ct.save._scripts.OnClick()
+assert(CT.Saved("LB", t.rank.rank).direct == nil, "rough results can't be saved")
+-- 60 more hits in each box
+FAKE_SP = 64; ct.before._scripts.OnClick()
+for i = 1, 3 do ns.Tabs.coef.Submit(ct, table.concat(before, " ")) end
+FAKE_SP = 84; ct.after._scripts.OnClick()
+for i = 1, 3 do ns.Tabs.coef.Submit(ct, table.concat(after, " ")) end
+r = CT.Result(t)
+print("80 hits each:", r.coef, r.margin, r.verdict)
+assert(r.verdict == "ok")
+-- Save it and check the Spells math uses it
+local before_calc = ns.SpellMath.Calc(t.spell, t.rank, ns.Profile.Player())
+ct.save._scripts.OnClick()
+local after_calc = ns.SpellMath.Calc(t.spell, t.rank, ns.Profile.Player())
+print("directC rule:", before_calc.directC, "after save:", after_calc.directC, after_calc.coefSource.direct)
+assert(after_calc.directC == 0.7 and after_calc.coefSource.direct == "test")
+for _, l in ipairs(ns.SpellMath.Explain(t.spell, t.rank, after_calc)) do print("  explain:", type(l) == "table" and (l[1] .. " = " .. l[2]) or l) end
+dumpCoef("saved")
+-- Undo and Forget
+ct.forget._scripts.OnClick()
+assert(ns.SpellMath.Calc(t.spell, t.rank, ns.Profile.Player()).coefSource.direct == "rule")
+-- Flame Shock ticks: fixed numbers, only rounding noise
+local fsRow
+for _, r in ipairs(ct.list.rows) do if r._shown and r.data.name == "Flame Shock" and r.sub._text:find("over time") then fsRow = r end end
+fsRow._scripts.OnClick(fsRow)
+local ft = ns.Tabs.coef.target
+assert(ft.part == "tick")
+FAKE_SP = 64
+ct.before._scripts.OnClick()
+dumpCoef("flame shock tick, empty")
+ns.Tabs.coef.Submit(ct, "9 9 9 9 9 9 9 9")
+FAKE_SP = 124
+ct.after._scripts.OnClick()
+ns.Tabs.coef.Submit(ct, "11 11 11 11 11 11")
+dumpCoef("flame shock ticks, +60 SP")
+local fr = CT.Result(ft)
+print("tick coef", fr.coef, "total", fr.total, "margin", fr.totalMargin, fr.verdict)
+assert(fr.ticks == 4 and math.abs(fr.total - 4 * 2 / 60) < 1e-9)
+-- Planner numbers (made-up spread of 3.5 = a 12 point range)
+print("hits needed +5/+20 SP:", ns.CoefMath.HitsNeeded(3.5, 5, 0.12), ns.CoefMath.HitsNeeded(3.5, 20, 0.12))
+print("SP needed for 4 fixed ticks:", ns.CoefMath.SpellPowerNeeded(0.12, 4))
+-- Combat log path (only if a client has it): fake one hit
+CombatLogGetCurrentEventInfo = nil
+SlashCmdList.THEEARTHENSHRINK("meter")
+print("spell power test passed")
