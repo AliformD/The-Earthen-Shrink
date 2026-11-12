@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.6.0"
+ns.VERSION = "0.7.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -55,15 +55,18 @@ end
 ---------------------------------------------------------------------------
 
 local DEFAULTS = {
-    -- Set to true if your spell tooltips already include your spell power.
-    -- (We don't know yet how Forever shows it. See "/es sptooltip".)
-    tooltipIncludesSpellPower = false,
+    -- True when spell tooltips already include your spell power. Angel saw
+    -- this in Forever (2026-11-12), so it's on. See "/es sptooltip".
+    tooltipIncludesSpellPower = true,
     -- Ranks and levels learned from the class trainer window (real Forever data).
     trainer = {},
     -- Play a sound when Windfury procs. Switch with /es sound.
     windfurySound = true,
     -- Sim Lab: count Intellect as attack power (Mental Dexterity talent).
     simMentalDex = false,
+    -- Sim Lab: points in Mental Quickness (Intellect gives spell power).
+    -- nil = read it from your talents if the game lets us.
+    simMentalQuick = nil,
 
     -- Weapon buff comparison settings (change them on the Weapon Buffs tab).
     -- Is a Shaman putting down Windfury Totem in your group?
@@ -71,11 +74,23 @@ local DEFAULTS = {
     -- Do Windfury Totem and Windfury Weapon both work at once? The tooltip
     -- says no, but a hotfix (Nov 2026) is changing it so they stack.
     wfStacks = true,
+    -- Is Flametongue Totem down in your group? And does it stack with
+    -- Flametongue Weapon? 🔶 Blizzard's notes say weapon buffs stack with
+    -- totems (Windfury was the example); not tested for Flametongue.
+    ftTotem = false,
+    ftStacks = true,
     -- 🔶 UNVERIFIED: how much of your Fire spell power Flametongue adds to
     -- each hit (0.1 = 10%). 0 until someone tests it in Forever.
     ftCoef = 0,
     -- How many main-hand swings the comparison simulates.
     swings = 50,
+
+    -- Spell Power Test tab: your Before/After hit lists, saved results,
+    -- ticks per cast, and which box typed numbers go into.
+    coefTests = {},
+    coefSaved = {},
+    coefTicks = {},
+    coefActive = "before",
 }
 
 function ns.db()
@@ -120,7 +135,13 @@ end
 
 ns.on("ADDON_LOADED", function(name)
     if name ~= ADDON then return end
-    ns.db()
+    local db = ns.db()
+    -- v0.7.0: Angel saw Forever's tooltips (Lightning Bolt, Flametongue) go
+    -- up with spell power, so switch this on once. /es sptooltip off undoes it.
+    if not db.migratedSpTooltip07 then
+        db.tooltipIncludesSpellPower = true
+        db.migratedSpTooltip07 = true
+    end
     if ns.SpellData then ns.SpellData.Init() end
     ns.say("loaded. Type |cffffd100/es|r to open.")
 end)
@@ -147,6 +168,12 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.UI.Toggle()
     elseif msg == "sim" or msg == "simlab" then
         ns.UI.Show("simlab")
+    elseif msg == "test" or msg == "sptest" or msg == "coef" then
+        ns.UI.Show("coef")
+    elseif msg == "changes" then
+        ns.GameCheck.Print()
+    elseif msg == "meter" then
+        ns.CoefTest.DumpMeter()
     elseif msg == "spells" or msg == "weapon" or msg == "inspect" or msg == "totems" or msg == "healing" then
         ns.UI.Show(msg)
         if msg == "inspect" then ns.Inspect.Start("target") end
@@ -160,11 +187,11 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.refresh("settings")
     elseif msg == "sound" or msg:match("^sound%s") then
         ns.Windfury.Slash(msg:match("^sound%s+(%a+)"))
-    elseif msg:match("^wftotem") or msg:match("^wfstack") or msg:match("^ftcoef") or msg:match("^swings") then
+    elseif msg:match("^wftotem") or msg:match("^wfstack") or msg:match("^fttotem") or msg:match("^ftstack") or msg:match("^ftcoef") or msg:match("^swings") then
         ns.ImbueMath.Slash(msg)
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es ftcoef 0.1, /es swings 50")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es changes, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es fttotem on|off, /es ftstack on|off, /es ftcoef 0.1, /es swings 50")
     end
 end

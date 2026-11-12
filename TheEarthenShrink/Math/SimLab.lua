@@ -17,10 +17,37 @@ S.RULES = {
     manaPerInt = 15,          -- 🔶 1 Intellect = 15 mana
     -- 🔶 Intellect for 1% spell crit: about 59.5 at level 60, less at low level.
     intPerSpellCrit = function(level) return 10 + 49.5 * (level / 60) end,
-    -- Mental Dexterity (Enhancement talent, 3/3): attack power equal to 100%
-    -- of your Intellect (Angel, 2026-11-10 hotfix). Only used when ticked.
-    mentalDexApPerInt = 1.0,
+    -- Mental Dexterity (Enhancement talent): attack power from Intellect.
+    -- A hotfix was announced to lower it to 100%, but on 2026-11-12 Angel
+    -- said it hasn't happened, so 150% (unverified). If the addon can read
+    -- the talent's text, that number wins. Only used when ticked.
+    mentalDexApPerInt = 1.5,
+    -- Mental Quickness (Enhancement talent): spell damage and healing equal
+    -- to 15% of your Intellect for each point. Angel-reported (in game,
+    -- 2026-11-12: 87 Int gave 13 spell power with 1 point). The exact
+    -- tooltip text isn't checked yet.
+    mentalQuickSpPerIntPerRank = 0.15,
+    mentalQuickMaxRank = 5,   -- guess; only limits the button
 }
+
+-- Attack power per Intellect from Mental Dexterity: from the talent's own
+-- text if we can read it, otherwise the rule above. Returns ratio, source.
+function S.MentalDexRatio()
+    local text = ns.Talents and ns.Talents.Description("Mental Dexterity")
+    local pct = text and text:lower():match("(%d+)%% of your intellect")
+    if pct then return tonumber(pct) / 100, "talent" end
+    return S.RULES.mentalDexApPerInt, "rule"
+end
+
+-- Points in Mental Quickness: your setting, or your talents, or 0.
+-- Returns rank, where it came from ("talents", "setting" or "none").
+function S.MentalQuickRank()
+    local set = ns.db().simMentalQuick
+    if type(set) == "number" then return set, "setting" end
+    local r = ns.Talents and ns.Talents.Rank("Mental Quickness")
+    if r then return r, "talents" end
+    return 0, "none"
+end
 
 -- The stats you can add. Order = order of the sliders.
 S.STATS = {
@@ -48,19 +75,27 @@ function S.Apply(p, add, opts)
     local R, L = S.RULES, p.level or 60
     local q = {}
     for k, v in pairs(p) do q[k] = v end
-    q.sp = {}
-    for school, v in pairs(p.sp or {}) do q.sp[school] = v + (add.sp or 0) end
-    q.source = "sim"
-
     local why = {}
     local function note(s) why[#why + 1] = s end
     local f = ns.fmt
 
+    -- Mental Quickness: Intellect also gives spell damage and healing.
+    local mq = opts.mentalQuick or 0
+    local spFromInt = (add.int or 0) * R.mentalQuickSpPerIntPerRank * mq
+    q.sp = {}
+    for school, v in pairs(p.sp or {}) do q.sp[school] = v + (add.sp or 0) + spFromInt end
+    q.source = "sim"
+    if spFromInt ~= 0 then
+        note(("%s Intellect × %s%% × %d (Mental Quickness) = %s spell power and healing"):format(
+            f(add.int), f(R.mentalQuickSpPerIntPerRank * 100), mq, f(spFromInt, 1)))
+    end
+
     local apFromStr = (add.str or 0) * R.apPerStr
-    local apFromInt = opts.mentalDex and (add.int or 0) * R.mentalDexApPerInt or 0
+    local mdRatio = S.MentalDexRatio()
+    local apFromInt = opts.mentalDex and (add.int or 0) * mdRatio or 0
     q.ap = (p.ap or 0) + apFromStr + apFromInt + (add.ap or 0)
     if apFromStr ~= 0 then note(("%s Strength × %s = %s attack power"):format(f(add.str), f(R.apPerStr), f(apFromStr))) end
-    if apFromInt ~= 0 then note(("%s Intellect × %s (Mental Dexterity) = %s attack power"):format(f(add.int), f(R.mentalDexApPerInt), f(apFromInt))) end
+    if apFromInt ~= 0 then note(("%s Intellect × %s (Mental Dexterity) = %s attack power"):format(f(add.int), f(mdRatio, 2), f(apFromInt))) end
 
     local critFromAgi = (add.agi or 0) / R.agiPerMeleeCrit
     q.meleeCrit = math.max(0, (p.meleeCrit or 0) + critFromAgi + (add.crit or 0))
@@ -77,7 +112,7 @@ function S.Apply(p, add, opts)
 
     q.hit = (p.hit or 0) + (add.hit or 0)
     q.spellHit = (p.spellHit or 0) + (add.hit or 0)
-    q.healing = (p.healing or 0) + (add.heal or 0)
+    q.healing = (p.healing or 0) + (add.heal or 0) + spFromInt
     if opts.weapon and opts.weapon.min then q.weapon = opts.weapon end
     return q, why
 end

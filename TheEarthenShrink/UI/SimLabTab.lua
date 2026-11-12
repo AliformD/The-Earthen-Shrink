@@ -144,8 +144,8 @@ local function buildSliders(page, top, height)
 
     -- Mental Dexterity: we can't read talents yet, so you tick it yourself.
     local cb = W.Create("CheckButton", nil, panel, { "UICheckButtonTemplate", "ChatConfigCheckButtonTemplate" })
-    cb:SetSize(22, 22)
-    cb:SetPoint("BOTTOMLEFT", 6, 6)
+    cb:SetSize(20, 20)
+    cb:SetPoint("BOTTOMLEFT", 6, 21)
     local label = W.Text(panel, "GameFontHighlightSmall", nil, "LEFT")
     label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
     label:SetText("I have Mental Dexterity (Intellect gives attack power)")
@@ -155,6 +155,34 @@ local function buildSliders(page, top, height)
         T.Update(page)
     end)
     page.mentalDex = cb
+
+    -- Mental Quickness: Intellect gives spell power. Click to set your
+    -- points yourself; right-click to go back to reading your talents.
+    local mq = W.Create("Button", nil, panel, { "UIPanelButtonTemplate" })
+    mq:SetSize(288, 18)
+    mq:SetPoint("BOTTOMLEFT", 6, 3)
+    mq:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    mq:SetScript("OnClick", function(_, mouse)
+        local S, db = ns.SimMath, ns.db()
+        if mouse == "RightButton" then
+            db.simMentalQuick = nil
+        else
+            local r = S.MentalQuickRank()
+            db.simMentalQuick = (r + 1) % (S.RULES.mentalQuickMaxRank + 1)
+        end
+        T.Update(page)
+    end)
+    mq:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Mental Quickness", 1, 1, 1)
+        GameTooltip:AddLine(("Each point: spell damage and healing = %s%% of your Intellect."):format(
+            ns.fmt(ns.SimMath.RULES.mentalQuickSpPerIntPerRank * 100)), 1, 0.82, 0, true)
+        GameTooltip:AddLine("Click to change your points. Right-click to let the addon read your talents.", 0.6, 0.6, 0.6, true)
+        GameTooltip:AddLine("15% per point is what Angel saw in game. The tooltip text isn't checked yet.", 0.6, 0.6, 0.6, true)
+        GameTooltip:Show()
+    end)
+    mq:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    page.mentalQuick = mq
 end
 
 function T.Build(page)
@@ -306,7 +334,10 @@ function T.Update(page)
     updateItemBox(page)
 
     local p = ns.Profile.Player()
-    local q, why = ns.SimMath.Apply(p, T.add, { mentalDex = db.simMentalDex, weapon = T.item and T.item.weapon })
+    local mqRank, mqFrom = ns.SimMath.MentalQuickRank()
+    page.mentalQuick:SetText(("Mental Quickness: %d point%s (%s)"):format(mqRank, mqRank == 1 and "" or "s",
+        mqFrom == "talents" and "read from talents" or mqFrom == "setting" and "set by you" or "click to set"))
+    local q, why = ns.SimMath.Apply(p, T.add, { mentalDex = db.simMentalDex, mentalQuick = mqRank, weapon = T.item and T.item.weapon })
     local rows = {}
     local dec = metric.decimals
 
@@ -378,6 +409,62 @@ function T.Update(page)
     end
 
     -- Your stats, now and with the changes.
+    -- Stat weight: 1 spell power vs 1 Strength, from your SP Test results.
+    rows[#rows + 1] = { header = "1 spell power is worth (your SP Tests)" }
+    local strDps = ns.CoefTest.StrengthDps(p)
+    local weights = ns.CoefTest.Weights(p)
+    for _, w in ipairs(weights) do
+        local t = w.t
+        rows[#rows + 1] = {
+            icon = t.rank.icon, name = t.spell.name,
+            sub = ("%s · %s per use · every %s sec"):format(ns.CoefTest.PART_NAMES[t.part] or t.part, f(w.saved.total, 2), f(t.every, 1)),
+            cols = { "", f(w.dps, 3), w.strEq and (f(w.strEq, 2) .. " Str") or "?" },
+            colColors = { W.GREY, W.WHITE, W.GREEN },
+            tooltip = function(tt)
+                tt:AddDoubleLine(t.spell.name, "Rank " .. t.rank.rank, 1, 1, 1, 0.6, 0.6, 0.6)
+                W.AddMath(tt, {
+                    { "Your SP Test", f(w.saved.total, 3) .. " ± " .. f(w.saved.totalMargin, 3) },
+                    ("1 spell power = %s more damage each use"):format(f(w.saved.total, 3)),
+                    ("÷ %s sec between uses = %s DPS"):format(f(t.every, 1), f(w.dps, 3)),
+                    strDps and ("1 Strength = %s melee DPS"):format(f(strDps, 3)) or "Couldn't read your weapon for Strength.",
+                    w.strEq and ("So 1 spell power ≈ %s Strength for this"):format(f(w.strEq, 2)) or "",
+                })
+                W.AddNote(tt, "Only counts this one spell or buff. If you use several, add their numbers up. Time between uses, misses and crits are old Classic rules, not tested in Forever.")
+            end,
+        }
+    end
+    if #weights == 0 then
+        rows[#rows + 1] = { icon = "Interface\\Icons\\Trade_Alchemy", name = "No saved tests yet",
+            sub = "Save a result on the SP Test tab", cols = { "", "", "" } }
+    end
+    -- 1 Intellect: spell power (Mental Quickness) + attack power (Mental Dexterity).
+    local int = ns.CoefTest.IntellectValue(p, { mentalDex = db.simMentalDex, mentalQuick = mqRank }, weights)
+    if int then
+        rows[#rows + 1] = {
+            icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", name = "1 Intellect (compare)",
+            sub = ("%s spell power + %s attack power"):format(f(int.sp, 2), f(int.ap, 1)),
+            cols = { "", f(int.dps, 3), int.strEq and (f(int.strEq, 2) .. " Str") or "?" },
+            colColors = { W.GREY, W.WHITE, W.GREEN },
+            tooltip = function(tt)
+                tt:AddLine("1 Intellect", 1, 1, 1)
+                W.AddMath(tt, {
+                    ("Mental Quickness %d × %s%% = %s spell power"):format(mqRank, f(ns.SimMath.RULES.mentalQuickSpPerIntPerRank * 100), f(int.sp, 2)),
+                    int.best and ("× %s DPS per spell power (%s, your best saved test) = %s DPS"):format(f(int.best.dps, 3), int.best.t.spell.name, f(int.spDps, 3))
+                        or "No saved SP Test yet, so spell power counts as 0 here.",
+                    db.simMentalDex and ("Mental Dexterity: +%s attack power = %s melee DPS"):format(f(int.ap, 1), f(int.apDps, 3))
+                        or "Mental Dexterity not ticked: no attack power.",
+                    { "Total", f(int.dps, 3) .. " DPS" },
+                })
+                W.AddNote(tt, "Intellect also gives mana and spell crit; those aren't in this number. 15% per point is Angel-reported, the tooltip isn't checked yet.")
+            end,
+        }
+    end
+    if strDps then
+        rows[#rows + 1] = { icon = "Interface\\Icons\\Ability_Warrior_BattleShout", name = "1 Strength (compare)",
+            sub = "Melee swing DPS from +2 attack power", cols = { "", f(strDps, 3), "1 Str" },
+            colColors = { W.GREY, W.WHITE, W.GREY } }
+    end
+
     rows[#rows + 1] = { header = "Your stats" }
     local STAT_ROWS = {
         { "Attack Power", "ap", 0, "Interface\\Icons\\Ability_Warrior_BattleShout" },

@@ -315,3 +315,247 @@ print("Rockbiter on:", "WF", rb.WF.calc.dps, "RB", rb.RB.calc.dps)
 assert(math.abs(rb.WF.calc.dps - base.WF.calc.dps) < 0.01, "Rockbiter AP should be removed")
 C_TooltipInfo.GetInventoryItem, UnitAttackPower = oldTT, oldAP
 print("weapon buff tests passed")
+
+-- Spell Power Test tab ------------------------------------------------------
+-- All hit numbers here are MADE UP to check the math, not Forever data.
+FAKE_SP = 64
+function GetSpellBonusDamage(i) return FAKE_SP end
+SlashCmdList.THEEARTHENSHRINK("test")
+local ct = TheEarthenShrinkFrame.pages.coef
+local CT = ns.CoefTest
+local function dumpCoef(title)
+  print("=== sp test: " .. title)
+  for _, r in ipairs(ct.list.rows) do
+    if r._shown then print(r.data.header and ("-- " .. r.data.header) or (r.name._text .. " | " .. r.sub._text .. " | " .. tostring(r.cols[1]._text) .. (r.data.selected and "  <selected>" or ""))) end
+  end
+  print("BEFORE: " .. ct.before.body._text:gsub("\n", " / ") .. "  [" .. ct.before.state._text .. "]")
+  print("AFTER:  " .. ct.after.body._text:gsub("\n", " / ") .. "  [" .. ct.after.state._text .. "]")
+  print("label:  " .. ct.entryLabel._text)
+  print("msg:    " .. ct.msg._text)
+  print("big:    " .. ct.big._text .. "   " .. ct.verdict._text)
+  for l in (ct.body._text .. "\n"):gmatch("(.-)\n") do print("   | " .. l) end
+  print("saved:  " .. ct.saved._text)
+end
+dumpCoef("empty")
+-- pick Lightning Bolt
+local lbRow
+for _, r in ipairs(ct.list.rows) do if r._shown and r.data.name == "Lightning Bolt" then lbRow = r end end
+lbRow._scripts.OnClick(lbRow)
+local t = ns.Tabs.coef.target
+assert(t.spell.key == "LB" and t.part == "direct")
+-- Before: 20 hits spread evenly over the tooltip range
+ct.before._scripts.OnClick()
+local lo, hi = t.rank.dmg.min, t.rank.dmg.max
+local before = {}
+for i = 0, 19 do before[#before+1] = tostring(math.floor(lo + (hi - lo) * i / 19 + 0.5)) end
+ns.Tabs.coef.Submit(ct, table.concat(before, " "))
+ns.Tabs.coef.Submit(ct, "11")          -- typo: too small
+print("typo msg:", ct.msg._text)
+assert(#CT.Test(t).before.hits == 20)
+ns.Tabs.coef.Submit(ct, "5000")        -- crit / typo: too big
+print("crit msg:", ct.msg._text)
+assert(#CT.Test(t).before.hits == 20)
+dumpCoef("20 before hits")
+-- Gear changed but still on BEFORE: refused
+FAKE_SP = 84
+ns.Tabs.coef.Submit(ct, tostring(lo + 14))
+print("sp changed msg:", ct.msg._text)
+assert(#CT.Test(t).before.hits == 20)
+-- After: +20 SP, every hit 14 bigger (coefficient 0.7)
+ct.after._scripts.OnClick()
+local after = {}
+for _, v in ipairs(before) do after[#after+1] = tostring(tonumber(v) + 14) end
+ns.Tabs.coef.Submit(ct, table.concat(after, ", "))
+dumpCoef("20 after hits, +20 SP")
+local r = CT.Result(t)
+assert(math.abs(r.coef - 0.7) < 1e-9, "coef should be 0.7")
+assert(r.verdict == "rough", "20 hits each with +20 SP is too rough")
+ct.save._scripts.OnClick()
+assert(CT.Saved("LB", t.rank.rank).direct == nil, "rough results can't be saved")
+-- 60 more hits in each box
+FAKE_SP = 64; ct.before._scripts.OnClick()
+for i = 1, 3 do ns.Tabs.coef.Submit(ct, table.concat(before, " ")) end
+FAKE_SP = 84; ct.after._scripts.OnClick()
+for i = 1, 3 do ns.Tabs.coef.Submit(ct, table.concat(after, " ")) end
+r = CT.Result(t)
+print("80 hits each:", r.coef, r.margin, r.verdict)
+assert(r.verdict == "ok")
+-- Save it and check the Spells math uses it
+local before_calc = ns.SpellMath.Calc(t.spell, t.rank, ns.Profile.Player())
+ct.save._scripts.OnClick()
+local after_calc = ns.SpellMath.Calc(t.spell, t.rank, ns.Profile.Player())
+print("directC rule:", before_calc.directC, "after save:", after_calc.directC, after_calc.coefSource.direct)
+assert(after_calc.directC == 0.7 and after_calc.coefSource.direct == "test")
+for _, l in ipairs(ns.SpellMath.Explain(t.spell, t.rank, after_calc)) do print("  explain:", type(l) == "table" and (l[1] .. " = " .. l[2]) or l) end
+dumpCoef("saved")
+-- Undo and Forget
+ct.forget._scripts.OnClick()
+assert(ns.SpellMath.Calc(t.spell, t.rank, ns.Profile.Player()).coefSource.direct == "rule")
+-- Flame Shock ticks: fixed numbers, only rounding noise
+local fsRow
+for _, r in ipairs(ct.list.rows) do if r._shown and r.data.name == "Flame Shock" and r.sub._text:find("over time") then fsRow = r end end
+fsRow._scripts.OnClick(fsRow)
+local ft = ns.Tabs.coef.target
+assert(ft.part == "tick")
+FAKE_SP = 64
+ct.before._scripts.OnClick()
+dumpCoef("flame shock tick, empty")
+ns.Tabs.coef.Submit(ct, "9 9 9 9 9 9 9 9")
+FAKE_SP = 124
+ct.after._scripts.OnClick()
+ns.Tabs.coef.Submit(ct, "11 11 11 11 11 11")
+dumpCoef("flame shock ticks, +60 SP")
+local fr = CT.Result(ft)
+print("tick coef", fr.coef, "total", fr.total, "margin", fr.totalMargin, fr.verdict)
+assert(fr.ticks == 4 and math.abs(fr.total - 4 * 2 / 60) < 1e-9)
+-- Planner numbers (made-up spread of 3.5 = a 12 point range)
+print("hits needed +5/+20 SP:", ns.CoefMath.HitsNeeded(3.5, 5, 0.12), ns.CoefMath.HitsNeeded(3.5, 20, 0.12))
+print("SP needed for 4 fixed ticks:", ns.CoefMath.SpellPowerNeeded(0.12, 4))
+-- Combat log path (only if a client has it): fake one hit
+CombatLogGetCurrentEventInfo = nil
+SlashCmdList.THEEARTHENSHRINK("meter")
+print("spell power test passed")
+
+-- Flametongue Weapon, Searing Totem and the spell power stat weight -----------
+FAKE_SP = 64
+SlashCmdList.THEEARTHENSHRINK("test")
+local function pick(name, part)
+  for _, r in ipairs(ct.list.rows) do
+    if r._shown and r.data.name == name and (not part or r.sub._text:find(part, 1, true)) then r._scripts.OnClick(r); return ns.Tabs.coef.target end
+  end
+end
+dumpCoef("list with weapon buffs and totems")
+local ftT = pick("Flametongue Weapon")
+assert(ftT and ftT.part == "proc", "Flametongue Weapon is testable")
+print("FT per hit guess:", ftT.avg, "every", ftT.every)
+ct.before._scripts.OnClick()
+ns.Tabs.coef.Submit(ct, "16 16 16 16 16 16")
+FAKE_SP = 124
+ct.after._scripts.OnClick()
+ns.Tabs.coef.Submit(ct, "19 19 19 19 19 19")
+dumpCoef("Flametongue, +60 SP")
+local before_ft
+for _, e in ipairs(ns.ImbueMath.Compare(ns.Profile.Player())) do if e.key == "FT" then before_ft = e.calc.dps end end
+ct.save._scripts.OnClick()
+local after_ft, ftLines
+for _, e in ipairs(ns.ImbueMath.Compare(ns.Profile.Player())) do if e.key == "FT" then after_ft = e.calc.dps; ftLines = e.calc.lines end end
+print("FT dps before save", before_ft, "after", after_ft)
+assert(after_ft > before_ft, "saved Flametongue result is used by Weapon Buffs")
+for _, l in ipairs(ftLines) do if type(l) == "table" and l[1]:find("Spell power") then print("  weapon tab:", l[1], l[2]) end end
+local stT = pick("Searing Totem")
+assert(stT and stT.part == "totem")
+dumpCoef("Searing Totem, empty")
+-- Sim Lab shows the stat weight rows
+FAKE_SP = 64
+SlashCmdList.THEEARTHENSHRINK("sim")
+local LB = CT.Targets(30)[1]
+CT.Test(LB).before = { sp = 64, hits = {} }
+for i = 1, 4 do for _, v in ipairs(before) do table.insert(CT.Test(LB).before.hits, tonumber(v)) end end
+CT.Test(LB).after = { sp = 84, hits = {} }
+for i = 1, 4 do for _, v in ipairs(after) do table.insert(CT.Test(LB).after.hits, tonumber(v)) end end
+assert(CT.Save(LB))
+ns.UI.Update()
+dumpSim("stat weights")
+print("flametongue + stat weight tests passed")
+
+-- Mental Quickness -----------------------------------------------------------
+ns.db().simMentalQuick = nil
+assert(ns.SimMath.MentalQuickRank() == 0, "no talent API in the fake game -> 0")
+GetNumTalentTabs = function() return 1 end
+GetNumTalents = function() return 1 end
+GetTalentInfo = function() return "Mental Quickness", 0, 1, 1, 1, 5 end
+local r, from = ns.SimMath.MentalQuickRank()
+print("mental quickness from talents:", r, from)
+assert(r == 1 and from == "talents")
+local p0 = ns.Profile.Player()
+local q0 = ns.SimMath.Apply(p0, { int = 100 }, { mentalQuick = 1 })
+print("+100 Int with 1 point: SP", p0.sp.Nature, "->", q0.sp.Nature, "healing", p0.healing, "->", q0.healing)
+assert(math.abs(q0.sp.Nature - p0.sp.Nature - 15) < 1e-9 and math.abs(q0.healing - p0.healing - 15) < 1e-9)
+sim.mentalQuick._scripts.OnClick(sim.mentalQuick, "LeftButton")
+assert(ns.db().simMentalQuick == 2)
+sim.mentalQuick._scripts.OnClick(sim.mentalQuick, "RightButton")
+assert(ns.db().simMentalQuick == nil)
+ns.db().simMentalDex = true
+ns.UI.Update()
+print("button:", sim.mentalQuick._text)
+dumpSim("Mental Quickness 1 + Mental Dexterity")
+for _, row in ipairs(sim.list.rows) do if row._shown and row.data.name == "1 Intellect (compare)" then tlines = {}; row.data.tooltip(GameTooltip); for _, l in ipairs(tlines) do print("     tt: " .. l) end end end
+print("mental quickness tests passed")
+
+-- Tooltip method (Forever tooltips go up with spell power) ----------------------
+FAKE_SP = 64
+ns.SpellData.Rebuild()
+SlashCmdList.THEEARTHENSHRINK("test")
+local lbT = pick("Lightning Bolt")
+CT.Clear(lbT, "before"); CT.Clear(lbT, "after")
+ns.db().coefSaved.LB = nil
+ct.before._scripts.OnClick()
+ct.readTip._scripts.OnClick()
+print("read msg:", ct.msg._text)
+local oldDesc = SPELLS[943].desc
+SPELLS[943].desc = "Casts a bolt of lightning at the target for 1,148 to 1,166 Nature damage."
+FAKE_SP = 88
+ct.after._scripts.OnClick()
+ct.readTip._scripts.OnClick()
+dumpCoef("tooltip method, +24 SP, both ends +17")
+local tr = CT.TooltipResult(lbT)
+print("tooltip coef", tr.coef, "±", tr.margin, tr.verdict)
+assert(math.abs(tr.coef - 17/24) < 1e-9 and tr.verdict == "good")
+ct.save._scripts.OnClick()
+assert(ns.db().coefSaved.LB[lbT.rank.rank].direct.method == "tooltip")
+-- No double counting: at the spell power the tooltip was read with, the math
+-- gives the tooltip's own average.
+ns.db().tooltipIncludesSpellPower = true
+ns.SpellData.Rebuild()
+local rk = ns.SpellData.Best("LB", 30)
+local cc = ns.SpellMath.Calc(ns.RANKS_BY_KEY.LB, rk, ns.Profile.Player())
+print("spRead", rk.spRead, "direct", cc.direct, "tooltip avg", (1148 + 1166) / 2)
+assert(math.abs(cc.direct - 1157) < 1e-9)
+SPELLS[943].desc = oldDesc
+-- Built-in Lightning Bolt rank 6 result from Angel's tooltip
+local seed = CT.Saved("LB", 6).direct
+print("seed LB 6:", seed.coef, seed.totalMargin, seed.note)
+assert(seed.seed and math.abs(seed.coef - 0.7083) < 0.001)
+print("tooltip method tests passed")
+
+-- Flametongue Totem stacking, Stormstrike, game change check ---------------------
+SPELLS[8227] = { name="Flametongue Totem", rank=1, mana=50, cast=0, desc="Summons a Flametongue Totem. Party members' weapons deal 6 to 22 additional Fire damage per hit, based on the speed of the weapon. Lasts 2 min.", lvl=28 }
+SPELLS[77001].desc = "Instantly strike an enemy with both weapons for 150% weapon damage. Your next Lightning Bolt, Chain Lightning or Earth Shock deals 20% more damage."
+local oldTip = C_TooltipInfo.GetSpellByID
+C_TooltipInfo.GetSpellByID = function(id)
+  local d = oldTip(id)
+  if d and id == 77001 then table.insert(d.lines, { leftText = "Instant", rightText = "6 sec cooldown" }) end
+  return d
+end
+FAKE_SP = 64
+ns.SpellData.Rebuild()
+local function ftDps()
+  local out = {}
+  for _, e in ipairs(ns.ImbueMath.Compare(ns.Profile.Player())) do out[e.key] = e.calc and e.calc.dps end
+  return out
+end
+local off = ftDps()
+SlashCmdList.THEEARTHENSHRINK("fttotem on")
+local stack = ftDps()
+SlashCmdList.THEEARTHENSHRINK("ftstack off")
+local nostack = ftDps()
+print("FT weapon gain: totem off", off.FT, "totem stacks", stack.FT, "totem doesn't stack", nostack.FT)
+assert(math.abs(stack.FT - off.FT) < 1e-6, "stacking: the weapon adds the same on top")
+assert(nostack.FT < stack.FT, "not stacking: the weapon only replaces the totem")
+local fttT = ns.ImbueMath.FtTotem(ns.Profile.Player())
+print("FT totem per hit", fttT.perHit, "searing dps", ns.TotemMath.SearingDps(ns.Profile.Player()))
+SlashCmdList.THEEARTHENSHRINK("fttotem off"); SlashCmdList.THEEARTHENSHRINK("ftstack on")
+local ss = ns.SpellData.Best("SS", 30)
+print("Stormstrike", ss.strikePct, ss.cooldown)
+assert(ss.strikePct == 1.5 and ss.cooldown == 6)
+print("Mental Dexterity ratio", ns.SimMath.MentalDexRatio())
+-- game change check: first run saves, a hotfix changes Stormstrike, next login reports it
+ns.db().gameSnapshot = nil
+assert(#ns.GameCheck.Check(true) == 0)
+SPELLS[77001].desc = "Instantly strike an enemy with both weapons for 100% weapon damage. Your next Lightning Bolt, Chain Lightning or Earth Shock deals 20% more damage."
+ns.SpellData.Rebuild()
+local ch = ns.GameCheck.Check(true)
+assert(#ch == 1 and ch[1].label == "Stormstrike rank 1 tooltip")
+assert(#ns.GameCheck.Check(true) == 0, "reported once")
+SlashCmdList.THEEARTHENSHRINK("changes")
+print("hotfix check tests passed")

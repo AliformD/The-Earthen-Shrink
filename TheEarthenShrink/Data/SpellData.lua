@@ -250,11 +250,22 @@ local function readRank(spell, id, rank, guessLevel)
         return nil
     end
     rec.nameOK = true
+    -- Your spell power when this tooltip was read. Forever's tooltips go up
+    -- with your spell power (Angel saw it on Flametongue), so the math
+    -- needs to know how much is already inside the numbers.
+    local idx = ns.Profile and ns.Profile.SCHOOL_INDEX[spell.school or (spell.key:match("^FT") and "Fire") or "Nature"]
+    rec.spRead = idx and ns.clean(ns.try(GetSpellBonusDamage, idx)) or nil
     rec.icon = type(info) == "table" and ns.clean(info.iconID) or nil
 
     local lines = tooltipLines(id)
     rec.mana, rec.manaSource = manaCost(id, lines)
     rec.cast = castSeconds(info, lines)
+    for _, l in ipairs(lines) do
+        local cd = l:match(NUM .. " sec cooldown") or l:match(NUM .. " sec Cooldown")
+        if cd then rec.cooldown = tonumber(cd) end
+        local cdm = l:match(NUM .. " min cooldown") or l:match(NUM .. " min Cooldown")
+        if cdm then rec.cooldown = tonumber(cdm) * 60 end
+    end
     rec.level, rec.levelSource = levelFor(spell.name, rank, id, guessLevel)
     rec.known = isKnown(id)
 
@@ -281,6 +292,8 @@ local function readRank(spell, id, rank, guessLevel)
         rec.totem = SD.ParseTotem(spell.totem, rec.desc)
         rec.parsed = rec.totem ~= nil
         if spell.key == "WFT" then rec.imbue = SD.ParseImbue("WF", rec.desc) end
+        -- Flametongue Totem gives fire damage on hits, like the weapon buff.
+        if spell.key == "FTT" then rec.imbue = SD.ParseImbue("FT", rec.desc) end
     elseif k == "shield" then
         rec.shield = SD.ParseShield(rec.desc)
         rec.parsed = rec.shield ~= nil
@@ -303,6 +316,11 @@ end
 ---------------------------------------------------------------------------
 -- Building the full list
 ---------------------------------------------------------------------------
+
+-- Reads one rank again right now (used by the SP Test "Read tooltip").
+function SD.ReadRank(spell, rank)
+    return readRank(spell, rank.id, rank.rank, rank.level)
+end
 
 -- Spells in your spellbook that match one of our spell names.
 local function spellbookRanks()
@@ -435,6 +453,8 @@ ns.on("SPELL_DATA_LOAD_RESULT", function(id)
     if pending[id] then pending[id] = nil; queueRebuild() end
 end)
 ns.on("SPELLS_CHANGED", queueRebuild)
+-- New gear = new spell power = new tooltip numbers.
+ns.on("PLAYER_EQUIPMENT_CHANGED", queueRebuild)
 ns.on("TRAINER_SHOW", function() C_Timer.After(1, readTrainer) end)
 
 -- /es check: shows what the addon could read, so we can spot problems.

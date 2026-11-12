@@ -57,6 +57,42 @@ function M.TotemProc(p)
     return { chance = rank.imbue.chance, attacks = rank.imbue.attacks, ap = rank.imbue.ap, name = "Windfury Totem", rank = rank }
 end
 
+-- Flametongue: fire damage on each hit for one rank (weapon "FT" or totem
+-- "FTT"). Takes the spell power already in the tooltip out, then adds
+-- spell power back with your SP Test result (or the setting for the weapon).
+-- Returns perHit (before crits), coef, tested, lines.
+function M.FlametonguePerHit(key, im, p)
+    local R, set, w, f = M.RULES, db(), p.weapon, ns.fmt
+    -- 🔶 The tooltip shows a range for fast to slow weapons. We scale the
+    -- top number by your weapon speed.
+    local perHit = im.min == im.max and im.max or im.max * w.speed / R.ftRefSpeed
+    local best = ns.SpellData.Best(key, p.level or 1)
+    local tested = best and ns.CoefTest and ns.CoefTest.Saved(key, best.rank).proc
+    local coef = tested and tested.coef or (key == "FT" and set.ftCoef) or 0
+    local sp = p.sp and p.sp.Fire or 0
+    local inTip = (set.tooltipIncludesSpellPower and best and best.spRead or 0) * coef
+    local base = math.max(0, perHit - inTip)
+    local L = {}
+    L[#L + 1] = { "Fire damage (tooltip)", f(im.min, 1) .. " to " .. f(im.max, 1) }
+    if im.min ~= im.max then
+        L[#L + 1] = ("%s × %s speed ÷ %s = %s fire per hit"):format(f(im.max, 1), f(w.speed, 2), f(R.ftRefSpeed, 1), f(perHit, 1))
+    end
+    L[#L + 1] = { "Spell power bonus " .. (tested and "|cff1eff00(your SP Test)|r" or "|cffff8000(unverified)|r"),
+        ("%s × %s%% = +%s"):format(f(sp), f(coef * 100, 1), f(sp * coef, 1)) }
+    return base + sp * coef, coef, tested, L
+end
+
+-- Flametongue Totem in your group: fire per hit, or nil + why not.
+function M.FtTotem(p)
+    if not db().ftTotem then return nil, "off" end
+    local rank = ns.SpellData.Best("FTT", p.level or 1)
+    if not rank then return nil, "Flametongue Totem isn't available at this level" end
+    if not (rank.imbue and rank.imbue.min) then return nil, "couldn't read the Flametongue Totem tooltip" end
+    if not (p.weapon and p.weapon.speed) then return nil, "no weapon found" end
+    local per, coef, tested, lines = M.FlametonguePerHit("FTT", rank.imbue, p)
+    return { perHit = per, rank = rank, coef = coef, tested = tested, lines = lines }
+end
+
 ---------------------------------------------------------------------------
 -- One swing
 ---------------------------------------------------------------------------
@@ -118,7 +154,9 @@ function M.Compare(p)
             if rb and rb.ap then ctx.ap = math.max(0, ctx.ap - rb.ap); ctx.removedRB = rb.ap end
         end
         ctx.totem, ctx.totemWhy = M.TotemProc(p)
-        local none = { procs = {} }
+        ctx.ftTotem, ctx.ftTotemWhy = M.FtTotem(p)
+        ctx.ftTotemHit = ctx.ftTotem and ctx.ftTotem.perHit * ctx.fireCrit or 0
+        local none = { procs = {}, onHit = ctx.ftTotemHit }
         if ctx.totem then none.procs[1] = ctx.totem end
         ctx.base = M.Swing(p, ctx, none)
     end
@@ -162,20 +200,11 @@ function M.CalcOne(key, im, p, ctx)
         short = ("+%sAP"):format(f(im.ap))
 
     elseif key == "FT" then
-        -- 🔶 The tooltip shows a range for fast to slow weapons. We scale the
-        -- top number by your weapon speed.
-        local perHit = im.min == im.max and im.max or im.max * w.speed / R.ftRefSpeed
-        local sp = p.sp and p.sp.Fire or 0
-        local coef = set.ftCoef or 0
-        local fromSP = sp * coef
-        buff.onHit = (perHit + fromSP) * ctx.fireCrit
-        L[#L + 1] = { "Fire damage (tooltip)", f(im.min, 1) .. " to " .. f(im.max, 1) }
-        if im.min ~= im.max then
-            L[#L + 1] = ("%s × %s speed ÷ %s = %s fire per hit"):format(f(im.max, 1), f(w.speed, 2), f(R.ftRefSpeed, 1), f(perHit, 1))
-        end
-        L[#L + 1] = { "Spell power bonus |cffff8000(unverified)|r", ("%s × %s%% = +%s"):format(f(sp), f(coef * 100), f(fromSP, 1)) }
+        local perHit, coef, tested, lines = M.FlametonguePerHit("FT", im, p)
+        buff.onHit = perHit * ctx.fireCrit
+        for _, l in ipairs(lines) do L[#L + 1] = l end
         if im.sp then L[#L + 1] = { "Also gives spell power (spells only)", "+" .. f(im.sp) } end
-        short = ("%.1f fire/hit"):format(perHit + fromSP)
+        short = ("%.1f fire/hit"):format(perHit)
 
     elseif key == "FB" then
         local chance = im.chance or (R.fbPPM * w.speed / 60 * 100)
@@ -192,6 +221,17 @@ function M.CalcOne(key, im, p, ctx)
         L[#L + 1] = { "Extra attacks", f(im.attacks) .. (im.attacksGuessed and " (guess)" or "") }
         L[#L + 1] = { "Bonus AP on extra attacks", "+" .. f(im.ap) }
         short = ("%d%% x%d +%dAP"):format(im.chance, im.attacks, im.ap)
+    end
+
+    -- Flametongue Totem: adds its fire to every buff, except maybe
+    -- Flametongue Weapon (🔶 unverified whether the two stack).
+    if ctx.ftTotem then
+        if key ~= "FT" or set.ftStacks then
+            buff.onHit = (buff.onHit or 0) + ctx.ftTotemHit
+            if key == "FT" then L[#L + 1] = { "Flametongue Totem", "stacks (setting) +" .. f(ctx.ftTotem.perHit, 1) .. " fire" } end
+        else
+            L[#L + 1] = { "Flametongue Totem", "|cffff4a3areplaced by the weapon buff (setting)|r" }
+        end
     end
 
     -- Windfury Totem: works with every buff except (maybe) Windfury Weapon.
@@ -254,6 +294,12 @@ function M.Slash(msg)
     elseif cmd == "wfstack" then
         set.wfStacks = onOff(arg, set.wfStacks)
         ns.say("Windfury Totem stacks with Windfury Weapon: " .. (set.wfStacks and "|cff1eff00yes|r" or "|cffff4a3ano|r"))
+    elseif cmd == "fttotem" then
+        set.ftTotem = onOff(arg, set.ftTotem)
+        ns.say("Flametongue Totem in your group: " .. (set.ftTotem and "|cff1eff00on|r" or "|cffff4a3aoff|r"))
+    elseif cmd == "ftstack" then
+        set.ftStacks = onOff(arg, set.ftStacks)
+        ns.say("Flametongue Totem stacks with Flametongue Weapon: " .. (set.ftStacks and "|cff1eff00yes|r" or "|cffff4a3ano|r") .. " (unverified)")
     elseif cmd == "ftcoef" then
         local v = tonumber(arg)
         if v and v >= 0 and v <= 2 then set.ftCoef = v end
