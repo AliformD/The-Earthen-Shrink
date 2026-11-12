@@ -20,8 +20,15 @@ local f = function(...) return ns.fmt(...) end
 
 -- Damage spells you can test, in list order.
 T.KEYS = { "LB", "CL", "ES", "FlS", "FrS", "FN", "LvB" }
+-- Weapon buffs and totems that do fire damage you can see and type.
+T.EXTRA_KEYS = { "FT", "FTT", "ST", "MT" }
 
-T.PART_NAMES = { direct = "Hit", tick = "Over time (each tick)" }
+T.PART_NAMES = { direct = "hit", tick = "over time", proc = "fire per swing", totem = "totem hit" }
+
+-- 🔶 OLD CLASSIC RULES used to guess "how often you use it" for the stat
+-- weight. Not tested in Forever.
+T.SHOCK_COOLDOWN = 6        -- Earth / Frost Shock: one every 6 sec
+T.SEARING_INTERVAL = 2.5    -- Searing Totem attacks every 2.5 sec (if its tooltip doesn't say)
 
 ---------------------------------------------------------------------------
 -- Saved data
@@ -36,20 +43,76 @@ local function db() return ns.db() end
 
 function T.Id(key, rank, part) return key .. ":" .. rank .. ":" .. part end
 
--- Everything you can test right now: your highest rank of each damage
--- spell, once for the hit and once for the ticks (if it has ticks).
+-- One thing you can test. Fields the page uses:
+--   low, high  = smallest and biggest normal hit with 0 spell power
+--   spread     = how much the hits jump around (0 = always the same number)
+--   avg        = the average hit with 0 spell power
+--   what       = what to type, in words
+--   every      = 🔶 how many seconds between uses (for the stat weight)
+local function target(spell, rank, part, fields)
+    local t = { spell = spell, rank = rank, part = part, id = T.Id(spell.key, rank.rank, part),
+                school = spell.school or "Fire" }
+    for k, v in pairs(fields) do t[k] = v end
+    t.avg = t.avg or (t.low + t.high) / 2
+    return t
+end
+
+local function castTime(rank) return math.max(rank.cast or 0, ns.SpellMath.RULES.gcd) end
+
+-- Flametongue (weapon or totem): fire damage on each of your swings.
+local function flametongue(spell, rank, weapon)
+    local im = rank.imbue
+    if not (im and im.min and weapon and weapon.speed) then return nil end
+    -- 🔶 The tooltip range is for slow to fast weapons; we scale by speed.
+    local per = im.min == im.max and im.max or im.max * weapon.speed / ns.ImbueMath.RULES.ftRefSpeed
+    return target(spell, rank, "proc", {
+        low = im.min, high = im.max, spread = 0, avg = per, fixed = true, school = "Fire",
+        what = "each " .. spell.name .. " fire hit on your swings (not crits)",
+        every = weapon.speed,
+    })
+end
+
+-- Everything you can test right now (your highest rank of each).
 function T.Targets(level)
     local list = {}
+    local C = ns.CoefMath
     for _, key in ipairs(T.KEYS) do
         local spell = ns.RANKS_BY_KEY[key]
         local rank = spell and ns.SpellData.Best(key, level)
         local d = rank and rank.dmg
         if d then
+            local isShock = key == "ES" or key == "FrS" or key == "FlS"
             if d.max and d.max > 0 then
-                list[#list + 1] = { spell = spell, rank = rank, part = "direct", id = T.Id(key, rank.rank, "direct") }
+                list[#list + 1] = target(spell, rank, "direct", {
+                    low = d.min, high = d.max, spread = C.SpreadFromRange(d.min, d.max),
+                    what = "each normal hit (not crits)",
+                    every = isShock and (d.dotSec or T.SHOCK_COOLDOWN) or castTime(rank),
+                })
             end
             if d.dot then
-                list[#list + 1] = { spell = spell, rank = rank, part = "tick", id = T.Id(key, rank.rank, "tick") }
+                local t = target(spell, rank, "tick", { low = 0, high = 0, spread = 0, fixed = true,
+                    what = "each tick", every = d.dotSec or 12 })
+                local tick = d.dot / T.Ticks(t)
+                t.low, t.high, t.avg = tick, tick, tick
+                list[#list + 1] = t
+            end
+        end
+    end
+
+    local weapon = ns.Profile.Player().weapon
+    for _, key in ipairs(T.EXTRA_KEYS) do
+        local spell = ns.RANKS_BY_KEY[key]
+        local rank = spell and ns.SpellData.Best(key, level)
+        if rank then
+            if key == "FT" or key == "FTT" then
+                list[#list + 1] = flametongue(spell, rank, weapon)
+            elseif rank.totem and rank.totem.min then
+                local tm = rank.totem
+                list[#list + 1] = target(spell, rank, "totem", {
+                    low = tm.min, high = tm.max, spread = C.SpreadFromRange(tm.min, tm.max),
+                    what = "each hit from the totem (not crits)",
+                    every = tm.interval or (key == "ST" and T.SEARING_INTERVAL) or 2,
+                })
             end
         end
     end
@@ -78,14 +141,20 @@ function T.Ticks(t)
 end
 function T.SetTicks(t, n) db().coefTicks[t.id] = math.max(1, math.min(20, n)); ns.refresh("coef") end
 
--- Your spell power for this spell's school (nil if the game hides it).
+-- Your spell power for this school (nil if the game hides it).
 function T.CurrentSP(t)
     local p = ns.Profile.Player()
-    return p.sp and ns.clean(p.sp[t.spell.school or "Nature"])
+    return p.sp and ns.clean(p.sp[t.school or "Nature"])
 end
 
 -- What the old Classic rule says, for this hit or ONE tick.
+-- nil = there is no rule we know of (weapon buffs and totems).
 function T.RuleCoef(t)
+    if t.part == "proc" then
+        local c = ns.db().ftCoef
+        return (c and c > 0) and c or nil
+    end
+    if t.part == "totem" then return nil end
     local directC, dotC = ns.SpellMath.RuleCoefficients(t.spell, t.rank)
     if t.part == "tick" then return dotC / T.Ticks(t) end
     return directC
@@ -96,14 +165,13 @@ end
 -- in Forever may be different from the rule.
 function T.Range(t, sp)
     sp = sp or 0
-    local d = t.rank.dmg
-    local rc = T.RuleCoef(t)
+    local rc = T.RuleCoef(t) or 0.3
     local extra = sp * (rc * 2 + 0.2)
     if t.part == "tick" then
-        local tick = d.dot / T.Ticks(t)
+        local tick = t.rank.dmg.dot / T.Ticks(t)
         return math.floor(tick * 0.85), math.ceil((tick + extra) * 1.1 + 1)
     end
-    return math.floor(d.min * 0.9), math.ceil((d.max + extra) * 1.05 + 1)
+    return math.floor(t.low * 0.9), math.ceil((t.high + extra) * 1.05 + 1)
 end
 
 ---------------------------------------------------------------------------
@@ -189,7 +257,7 @@ function T.Save(t)
         verdict = r.verdict, date = date and date("%Y-%m-%d") or nil,
     }
     ns.say(("saved: %s rank %d %s = %s ± %s. The Spells tab and Sim Lab use it now."):format(
-        t.spell.name, rank, t.part == "tick" and "over time" or "hit", f(r.total, 3), f(r.totalMargin, 3)))
+        t.spell.name, rank, T.PART_NAMES[t.part] or t.part, f(r.total, 3), f(r.totalMargin, 3)))
     ns.refresh("coef")
     return true
 end
@@ -198,6 +266,49 @@ function T.Forget(t)
     local s = db().coefSaved[t.spell.key]
     if s and s[t.rank.rank] then s[t.rank.rank][t.part] = nil end
     ns.refresh("coef")
+end
+
+---------------------------------------------------------------------------
+-- Stat weight: how much is 1 spell power worth, next to 1 Strength?
+---------------------------------------------------------------------------
+
+-- Melee DPS you get from +1 Strength (your weapon, attack power rules).
+function T.StrengthDps(p)
+    p = p or ns.Profile.Player()
+    local S = ns.SimMath
+    local now = S.Melee(p)
+    local plus = S.Melee((S.Apply(p, { str = 1 })))
+    if not (now and plus) then return nil end
+    return plus.dps - now.dps, now.land
+end
+
+-- coef = damage per spell power for ONE use (for ticks: the whole spell).
+-- Returns { dps = DPS from 1 spell power, strEq = how many Strength that is }.
+-- 🔶 Leaves out crits and misses on spells, and assumes you use it every
+-- t.every seconds.
+function T.Weight(t, coef, p)
+    if not (coef and t.every and t.every > 0) then return nil end
+    local strDps, land = T.StrengthDps(p)
+    local perUse = coef
+    -- Flametongue only adds fire when the swing lands.
+    if t.part == "proc" then perUse = coef * (land or 1) end
+    local w = { dps = perUse / t.every, strDps = strDps }
+    if strDps and strDps > 0 then w.strEq = w.dps / strDps end
+    return w
+end
+
+-- Every saved result you can use now, with its stat weight.
+function T.Weights(p)
+    p = p or ns.Profile.Player()
+    local out = {}
+    for _, t in ipairs(T.Targets(p.level or UnitLevel("player") or 1)) do
+        local saved = T.Saved(t.spell.key, t.rank.rank)[t.part]
+        if saved then
+            local w = T.Weight(t, saved.total, p)
+            if w then w.t, w.saved = t, saved; out[#out + 1] = w end
+        end
+    end
+    return out
 end
 
 ---------------------------------------------------------------------------

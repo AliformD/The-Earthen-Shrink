@@ -415,3 +415,45 @@ print("SP needed for 4 fixed ticks:", ns.CoefMath.SpellPowerNeeded(0.12, 4))
 CombatLogGetCurrentEventInfo = nil
 SlashCmdList.THEEARTHENSHRINK("meter")
 print("spell power test passed")
+
+-- Flametongue Weapon, Searing Totem and the spell power stat weight -----------
+FAKE_SP = 64
+SlashCmdList.THEEARTHENSHRINK("test")
+local function pick(name, part)
+  for _, r in ipairs(ct.list.rows) do
+    if r._shown and r.data.name == name and (not part or r.sub._text:find(part, 1, true)) then r._scripts.OnClick(r); return ns.Tabs.coef.target end
+  end
+end
+dumpCoef("list with weapon buffs and totems")
+local ftT = pick("Flametongue Weapon")
+assert(ftT and ftT.part == "proc", "Flametongue Weapon is testable")
+print("FT per hit guess:", ftT.avg, "every", ftT.every)
+ct.before._scripts.OnClick()
+ns.Tabs.coef.Submit(ct, "16 16 16 16 16 16")
+FAKE_SP = 124
+ct.after._scripts.OnClick()
+ns.Tabs.coef.Submit(ct, "19 19 19 19 19 19")
+dumpCoef("Flametongue, +60 SP")
+local before_ft
+for _, e in ipairs(ns.ImbueMath.Compare(ns.Profile.Player())) do if e.key == "FT" then before_ft = e.calc.dps end end
+ct.save._scripts.OnClick()
+local after_ft, ftLines
+for _, e in ipairs(ns.ImbueMath.Compare(ns.Profile.Player())) do if e.key == "FT" then after_ft = e.calc.dps; ftLines = e.calc.lines end end
+print("FT dps before save", before_ft, "after", after_ft)
+assert(after_ft > before_ft, "saved Flametongue result is used by Weapon Buffs")
+for _, l in ipairs(ftLines) do if type(l) == "table" and l[1]:find("Spell power") then print("  weapon tab:", l[1], l[2]) end end
+local stT = pick("Searing Totem")
+assert(stT and stT.part == "totem")
+dumpCoef("Searing Totem, empty")
+-- Sim Lab shows the stat weight rows
+FAKE_SP = 64
+SlashCmdList.THEEARTHENSHRINK("sim")
+local LB = CT.Targets(30)[1]
+CT.Test(LB).before = { sp = 64, hits = {} }
+for i = 1, 4 do for _, v in ipairs(before) do table.insert(CT.Test(LB).before.hits, tonumber(v)) end end
+CT.Test(LB).after = { sp = 84, hits = {} }
+for i = 1, 4 do for _, v in ipairs(after) do table.insert(CT.Test(LB).after.hits, tonumber(v)) end end
+assert(CT.Save(LB))
+ns.UI.Update()
+dumpSim("stat weights")
+print("flametongue + stat weight tests passed")

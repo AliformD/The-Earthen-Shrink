@@ -166,14 +166,18 @@ function M.CalcOne(key, im, p, ctx)
         -- top number by your weapon speed.
         local perHit = im.min == im.max and im.max or im.max * w.speed / R.ftRefSpeed
         local sp = p.sp and p.sp.Fire or 0
-        local coef = set.ftCoef or 0
+        -- Your own SP Test result wins over the setting.
+        local best = ns.SpellData.Best("FT", p.level or 1)
+        local tested = best and ns.CoefTest and ns.CoefTest.Saved("FT", best.rank).proc
+        local coef = tested and tested.coef or set.ftCoef or 0
         local fromSP = sp * coef
         buff.onHit = (perHit + fromSP) * ctx.fireCrit
         L[#L + 1] = { "Fire damage (tooltip)", f(im.min, 1) .. " to " .. f(im.max, 1) }
         if im.min ~= im.max then
             L[#L + 1] = ("%s × %s speed ÷ %s = %s fire per hit"):format(f(im.max, 1), f(w.speed, 2), f(R.ftRefSpeed, 1), f(perHit, 1))
         end
-        L[#L + 1] = { "Spell power bonus |cffff8000(unverified)|r", ("%s × %s%% = +%s"):format(f(sp), f(coef * 100), f(fromSP, 1)) }
+        L[#L + 1] = { "Spell power bonus " .. (tested and "|cff1eff00(your SP Test)|r" or "|cffff8000(unverified)|r"),
+            ("%s × %s%% = +%s"):format(f(sp), f(coef * 100, 1), f(fromSP, 1)) }
         if im.sp then L[#L + 1] = { "Also gives spell power (spells only)", "+" .. f(im.sp) } end
         short = ("%.1f fire/hit"):format(perHit + fromSP)
 

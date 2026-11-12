@@ -281,6 +281,8 @@ local function readRank(spell, id, rank, guessLevel)
         rec.totem = SD.ParseTotem(spell.totem, rec.desc)
         rec.parsed = rec.totem ~= nil
         if spell.key == "WFT" then rec.imbue = SD.ParseImbue("WF", rec.desc) end
+        -- Flametongue Totem gives fire damage on hits, like the weapon buff.
+        if spell.key == "FTT" then rec.imbue = SD.ParseImbue("FT", rec.desc) end
     elseif k == "shield" then
         rec.shield = SD.ParseShield(rec.desc)
         rec.parsed = rec.shield ~= nil

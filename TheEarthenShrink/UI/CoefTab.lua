@@ -278,26 +278,29 @@ function T.Update(page)
     T.target = t
 
     -- Left list
-    local rows = { { header = "Your highest ranks" } }
+    local rows = {}
+    local lastGroup
     for _, x in ipairs(list) do
+        local group = (x.part == "direct" or x.part == "tick") and "Spells (your highest rank)" or "Weapon buffs and totems"
+        if group ~= lastGroup then rows[#rows + 1] = { header = group }; lastGroup = group end
         local saved = CT.Saved(x.spell.key, x.rank.rank)[x.part]
         local test = CT.Test(x)
         local n = #test.before.hits + #test.after.hits
         rows[#rows + 1] = {
             icon = x.rank.icon, name = x.spell.name,
-            sub = "Rank " .. x.rank.rank .. " · " .. (x.part == "tick" and "over time" or "hit") .. (n > 0 and (" · " .. n .. " hits") or ""),
+            sub = "Rank " .. x.rank.rank .. " · " .. (CT.PART_NAMES[x.part] or x.part) .. (n > 0 and (" · " .. n .. " hits") or ""),
             cols = { saved and f(saved.total, 2) or "-" },
             colColors = { saved and W.GREEN or W.GREY },
             selected = x.id == T.selected, badge = saved ~= nil,
             onClick = function() T.selected = x.id; T.message = nil; T.Update(page) end,
             tooltip = function(tt)
                 tt:AddDoubleLine(x.spell.name, "Rank " .. x.rank.rank, 1, 1, 1, 0.6, 0.6, 0.6)
-                tt:AddLine(x.part == "tick" and "Tests the damage over time (one tick at a time)." or "Tests the direct hit.", 1, 0.82, 0, true)
+                tt:AddLine("Type " .. x.what .. ".", 1, 0.82, 0, true)
                 if saved then
                     tt:AddDoubleLine("Your saved result", f(saved.total, 3) .. " ± " .. f(saved.totalMargin, 3), 1, 0.82, 0, 0.12, 1, 0)
                 end
-                local rc = CT.RuleCoef(x) * CT.Ticks(x)
-                tt:AddDoubleLine("Old Classic rule (untested)", f(rc, 3), 1, 0.82, 0, 0.6, 0.6, 0.6)
+                local rc = CT.RuleCoef(x)
+                tt:AddDoubleLine("Old Classic rule (untested)", rc and f(rc * CT.Ticks(x), 3) or "none known", 1, 0.82, 0, 0.6, 0.6, 0.6)
             end,
         }
     end
@@ -324,9 +327,12 @@ function T.Update(page)
     paintBox(page.after, active == "after")
 
     -- Typing box
-    local what = t.part == "tick" and "each tick" or "each normal hit (not crits)"
-    page.entryLabel:SetText(("Type %s of %s and press Enter."):format(
-        t.part == "tick" and "each tick" or "each normal hit (not crits)", t.spell.name))
+    local what = t.what
+    if t.part == "direct" or t.part == "tick" then
+        page.entryLabel:SetText(("Type %s of %s and press Enter."):format(what, t.spell.name))
+    else
+        page.entryLabel:SetText(("Type %s and press Enter."):format(what))
+    end
     if page.auto then
         page.auto:SetChecked(CT.autoOn)
     end
@@ -348,7 +354,8 @@ function T.Update(page)
     if isTick then page.ticksLabel:SetText(("Ticks per cast: %d (count them)"):format(ticks)) end
 
     -- Result
-    local ruleTotal = CT.RuleCoef(t) * ticks
+    local rule = CT.RuleCoef(t)
+    local ruleTotal = rule and rule * ticks
     local lines = {}
     local function add(s) lines[#lines + 1] = s end
     local v = VERDICT[res.verdict] or VERDICT.wait
@@ -359,14 +366,13 @@ function T.Update(page)
     -- enough, or else from the tooltip range.
     local spread
     if res.before.n >= C.RULES.minHits then spread = res.before.sd
-    elseif t.part == "tick" then spread = 0
-    else spread = C.SpreadFromRange(t.rank.dmg.min, t.rank.dmg.max) end
+    else spread = t.spread or 0 end
 
     if res.verdict == "wait" then
         page.big:SetText("?")
         page.big:SetTextColor(0.6, 0.6, 0.6)
         if res.before.n == 0 and res.after.n == 0 then
-            add("|cffffd1001.|r Click BEFORE. Cast " .. t.spell.name .. " on a mob and type " .. what .. ".")
+            add("|cffffd1001.|r Click BEFORE. Use " .. t.spell.name .. " on a mob and type " .. what .. ".")
             add("|cffffd1002.|r Put on gear with more spell power. The more, the better.")
             add("|cffffd1003.|r Click AFTER and do the same.")
         else
@@ -382,14 +388,18 @@ function T.Update(page)
         end
         add("|cffffd100Hits needed in each box, by spell power added:|r")
         add(planner(t, spread, { 5, 10, 20, 40 }))
-        if t.part == "tick" then
+        if (spread or 0) < 0.5 then
             local need = C.SpellPowerNeeded(C.RULES.okMargin, ticks)
-            add(("Ticks are usually the same every time, so more ticks don't help much. You need about +%d spell power. With +5, each tick grows only about %s."):format(
-                need, f(CT.RuleCoef(t) * 5, 2)))
-        else
-            local grow = CT.RuleCoef(t) * 5
+            add(("These hits are usually the same number every time, so typing more of them doesn't help much. You need about +%d spell power%s."):format(
+                need, rule and (". With +5, each grows only about " .. f(rule * 5, 2)) or ""))
+            if t.part == "proc" then
+                add("|cff999999Nobody knows yet if Flametongue gets spell power in Forever. A result near 0 is a real answer too.|r")
+            end
+        elseif rule then
             add(("With +5 spell power each hit grows only about %s, but hits jump around by %s. That's why it takes many hits."):format(
-                f(grow, 1), f((t.rank.dmg.max or 0) - (t.rank.dmg.min or 0))))
+                f(rule * 5, 1), f(t.high - t.low)))
+        else
+            add(("Hits jump around by %s, so it takes many hits. Nobody knows yet how much spell power this gets in Forever."):format(f(t.high - t.low)))
         end
     else
         page.big:SetText(f(res.total, 3) .. "  ± " .. f(res.totalMargin, 3))
@@ -403,7 +413,14 @@ function T.Update(page)
         else
             add(("So each point of spell power adds about %s damage."):format(f(res.coef, 2)))
         end
-        add(("Old Classic rule says %s |cff999999(not tested in Forever)|r."):format(f(ruleTotal, 3)))
+        if ruleTotal then
+            add(("Old Classic rule says %s |cff999999(not tested in Forever)|r."):format(f(ruleTotal, 3)))
+        end
+        local w = CT.Weight(t, res.total)
+        if w and w.strEq then
+            add(("Stat weight: 1 spell power here = %s DPS = about %s Strength |cff999999(if used every %s sec)|r."):format(
+                f(w.dps, 3), f(w.strEq, 2), f(t.every, 1)))
+        end
         if res.before.roundingLimited and res.after.roundingLimited then
             add("Every number was the same, so more hits won't help. More spell power will.")
         elseif res.verdict ~= "good" then
@@ -411,7 +428,9 @@ function T.Update(page)
             add(n and ("For a Good result: about %s hits in each box."):format(f(n))
                 or "For a Good result you need a bigger spell power change.")
         end
-        add("|cff999999Same mob type, no buffs or debuffs that change damage (like Stormstrike).|r")
+        if not (w and w.strEq) then
+            add("|cff999999Same mob type, no buffs or debuffs that change damage (like Stormstrike).|r")
+        end
     end
     page.body:SetText(table.concat(lines, "\n"))
 

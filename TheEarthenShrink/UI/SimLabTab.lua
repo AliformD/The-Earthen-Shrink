@@ -378,6 +378,40 @@ function T.Update(page)
     end
 
     -- Your stats, now and with the changes.
+    -- Stat weight: 1 spell power vs 1 Strength, from your SP Test results.
+    rows[#rows + 1] = { header = "1 spell power is worth (your SP Tests)" }
+    local strDps = ns.CoefTest.StrengthDps(p)
+    local weights = ns.CoefTest.Weights(p)
+    for _, w in ipairs(weights) do
+        local t = w.t
+        rows[#rows + 1] = {
+            icon = t.rank.icon, name = t.spell.name,
+            sub = ("%s · %s per use · every %s sec"):format(ns.CoefTest.PART_NAMES[t.part] or t.part, f(w.saved.total, 2), f(t.every, 1)),
+            cols = { "", f(w.dps, 3), w.strEq and (f(w.strEq, 2) .. " Str") or "?" },
+            colColors = { W.GREY, W.WHITE, W.GREEN },
+            tooltip = function(tt)
+                tt:AddDoubleLine(t.spell.name, "Rank " .. t.rank.rank, 1, 1, 1, 0.6, 0.6, 0.6)
+                W.AddMath(tt, {
+                    { "Your SP Test", f(w.saved.total, 3) .. " ± " .. f(w.saved.totalMargin, 3) },
+                    ("1 spell power = %s more damage each use"):format(f(w.saved.total, 3)),
+                    ("÷ %s sec between uses = %s DPS"):format(f(t.every, 1), f(w.dps, 3)),
+                    strDps and ("1 Strength = %s melee DPS"):format(f(strDps, 3)) or "Couldn't read your weapon for Strength.",
+                    w.strEq and ("So 1 spell power ≈ %s Strength for this"):format(f(w.strEq, 2)) or "",
+                })
+                W.AddNote(tt, "Only counts this one spell or buff. If you use several, add their numbers up. Time between uses, misses and crits are old Classic rules, not tested in Forever.")
+            end,
+        }
+    end
+    if #weights == 0 then
+        rows[#rows + 1] = { icon = "Interface\\Icons\\Trade_Alchemy", name = "No saved tests yet",
+            sub = "Save a result on the SP Test tab", cols = { "", "", "" } }
+    end
+    if strDps then
+        rows[#rows + 1] = { icon = "Interface\\Icons\\Ability_Warrior_BattleShout", name = "1 Strength (compare)",
+            sub = "Melee swing DPS from +2 attack power", cols = { "", f(strDps, 3), "1 Str" },
+            colColors = { W.GREY, W.WHITE, W.GREY } }
+    end
+
     rows[#rows + 1] = { header = "Your stats" }
     local STAT_ROWS = {
         { "Attack Power", "ap", 0, "Interface\\Icons\\Ability_Warrior_BattleShout" },
