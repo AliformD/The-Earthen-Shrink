@@ -159,8 +159,16 @@ function P.Player()
     -- Forever uses one crit chance and one hit chance for everything.
     p.spellCrit = ns.clean(ns.try(GetSpellCritChance, SCHOOL_INDEX.Nature)) or 0
     p.meleeCrit = ns.clean(ns.try(GetCritChance)) or p.spellCrit
-    p.hit = ns.clean(ns.try(GetHitModifier)) or 0
+    -- Hit: the game's own total. GetHitModifier = hit from gear lines,
+    -- talents and racials (anything that's an "aura" on you). If Forever
+    -- gear uses hit RATING, that part is separate, so we add it.
+    p.hitParts = { mod = ns.clean(ns.try(GetHitModifier)) or 0 }
+    local hitRating = ns.HitCrit and ns.HitCrit.RatingBonus("hit") or 0
+    p.hitParts.rating = hitRating
+    p.hit = p.hitParts.mod + hitRating
     p.spellHit = ns.clean(ns.try(GetSpellHitModifier)) or p.hit
+    if p.spellHit > 30 then p.spellHit = p.hit end      -- not a sane % (some clients); use melee hit
+    if p.spellHit < p.hit then p.spellHit = p.hit end   -- Forever: one combined hit
 
     local base, pos, neg = ns.try(UnitAttackPower, "player")
     p.ap = (ns.clean(base) or 0) + (ns.clean(pos) or 0) + (ns.clean(neg) or 0)

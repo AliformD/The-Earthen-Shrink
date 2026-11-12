@@ -281,7 +281,7 @@ local function buildSliders(page, top, height)
     sectionTitle(panel, "HOW YOU PLAY", y)
     page.styleButtons = buildStyleButtons(panel, y - 15)
     page.fight = W.StatSlider(panel, 280, {
-        label = "Fight length", min = 15, max = 300, step = 15, compact = true, valueWidth = 50,
+        label = "Fight length", min = ns.Rotation.FIGHT_MIN, max = ns.Rotation.FIGHT_MAX, step = ns.Rotation.FIGHT_STEP, compact = true, valueWidth = 50,
         format = function(v) return ns.fmt(v) .. " sec" end,
         onChange = function(v)
             ns.db().simFight = v
@@ -289,7 +289,7 @@ local function buildSliders(page, top, height)
         end,
         tooltip = function(tt)
             tt:AddLine("Fight length", 1, 1, 1)
-            tt:AddLine("How long one fight lasts. In a long fight your mana can run out, so Intellect (more mana) is worth more.", 1, 0.82, 0, true)
+            tt:AddLine("How long one fight lasts: 10 to 30 sec, like killing mobs while questing. In a longer fight your mana can run out, so Intellect (more mana) is worth more.", 1, 0.82, 0, true)
             W.AddNote(tt, "🔶 Mana you get back during the fight (Spirit, Mana Spring) isn't counted yet.")
         end,
     })
@@ -926,7 +926,7 @@ function T.PercentNote(tt, key, q)
 end
 
 -- The "Hit and crit" rows under the weights.
-function T.CritHitRows(rows, w, q)
+function T.CritHitRows(rows, w, q, real)
     local H = ns.HitCrit
     local target = H.Target(q)
     local melee, spell = H.Caps(q)
@@ -959,9 +959,23 @@ function T.CritHitRows(rows, w, q)
         sub = mText .. " · " .. sText .. " 🔶", cols = { "", "", "" },
         tooltip = function(tt)
             tt:AddLine("Hit chance and the hit cap", 1, 1, 1)
-            tt:AddLine("Every attack can miss. Hit from gear (and talents) takes misses away, 1% at a time. When you have enough that you never miss, you're \"hit capped\" and more hit does nothing.", 1, 0.82, 0, true)
+            tt:AddLine("Every attack can miss. Hit from gear, talents and your race takes misses away, 1% at a time. When you have enough that you never miss, you're \"hit capped\" and more hit does nothing.", 1, 0.82, 0, true)
             tt:AddLine(" ")
-            tt:AddDoubleLine("Your hit (gear + talents, from the game)", f(hit, 1) .. "%", 1, 0.82, 0, 1, 1, 1)
+            -- Where your real hit comes from (read from the game).
+            local src = ns.HitCrit.HitSources(real)
+            tt:AddDoubleLine("Your hit, from the game (all sources)", f(src.total, 1) .. "%", 1, 0.82, 0, 1, 1, 1)
+            for _, part in ipairs(src.parts) do
+                tt:AddDoubleLine("   " .. part.name .. " · " .. part.kind, "+" .. f(part.pct, 1) .. "%", 0.91, 0.89, 0.78, 1, 1, 1)
+            end
+            if math.abs(src.other) >= 0.05 then
+                tt:AddDoubleLine("   gear and anything else", (src.other > 0 and "+" or "") .. f(src.other, 1) .. "%", 0.91, 0.89, 0.78, 1, 1, 1)
+            end
+            if #src.parts == 0 then
+                tt:AddLine("   (couldn't find a talent or racial that mentions hit; the total above is still the game's own number)", 0.6, 0.6, 0.6, true)
+            end
+            if math.abs(hit - src.total) >= 0.05 then
+                tt:AddDoubleLine("   with your Sim Lab change", f(hit, 1) .. "%", 0.91, 0.89, 0.78, 0.4, 0.8, 1)
+            end
             tt:AddDoubleLine("Melee cap vs " .. target.short, f(melee) .. "%", 1, 0.82, 0, 1, 1, 1)
             tt:AddDoubleLine("Spell cap vs " .. target.short, f(spell) .. "%", 1, 0.82, 0, 1, 1, 1)
             tt:AddLine(" ")
@@ -1072,7 +1086,7 @@ local function weightRows(p, q, opts)
         rows[#rows + 1] = row
     end
 
-    T.CritHitRows(rows, w, q)
+    T.CritHitRows(rows, w, q, p)
 
     -- Copy-ready text for other addons.
     rows[#rows + 1] = { header = "Copy for other addons (click a row)" }
