@@ -43,6 +43,10 @@ local function itemLines(unit, slot, link)
     return linesOf(data)
 end
 
+-- "Windfury Totem" must be checked before "Windfury".
+local IMBUE_NAMES = { { "Rockbiter", "RB" }, { "Flametongue", "FT" }, { "Frostbrand", "FB" },
+                      { "Windfury Totem", "WFT" }, { "Windfury", "WF" } }
+
 local PRIMARY = { Strength = "str", Agility = "agi", Stamina = "sta", Intellect = "int", Spirit = "spi" }
 
 -- Adds up the stats on one item. Returns a table like { str = 5, sp = 12 }.
@@ -61,6 +65,12 @@ function P.ReadItemLines(lines, into)
         -- Weapon damage and speed: "35 - 66 Damage", "Speed 2.60"
         local a, b = l:match("^(%d+) %- (%d+)%s+%a*%s*Damage")
         if a and not into.wMin then into.wMin, into.wMax = tonumber(a), tonumber(b) end
+        -- A weapon buff shows on the weapon as a green line like "Rockbiter 3 (60 min)".
+        if not into.imbueNow then
+            for _, pair in ipairs(IMBUE_NAMES) do
+                if l:find("^" .. pair[1] .. " ?%d*%s*%(") then into.imbueNow = pair[2]; break end
+            end
+        end
         local sp = l:match("Speed (%d+%.%d+)")
         if sp and not into.wSpeed then into.wSpeed = tonumber(sp) end
     end
@@ -71,8 +81,9 @@ function P.ReadWeapon(unit)
     local link = ns.try(GetInventoryItemLink, unit, SLOT_MAIN_HAND)
     if not link then return nil end
     local s = P.ReadItemLines(itemLines(unit, SLOT_MAIN_HAND, link))
-    if not s.wMin then return { link = link } end
-    return { link = link, min = s.wMin, max = s.wMax, speed = s.wSpeed, name = link:match("%[(.-)%]") }
+    if not s.wMin then return { link = link, imbueNow = s.imbueNow } end
+    return { link = link, min = s.wMin, max = s.wMax, speed = s.wSpeed, name = link:match("%[(.-)%]"),
+             imbueNow = s.imbueNow }
 end
 
 ---------------------------------------------------------------------------
@@ -111,6 +122,7 @@ function P.Player()
     -- already inside p.ap, so the math would count it twice.
     local hasMH = ns.try(GetWeaponEnchantInfo)
     p.hasImbueNow = hasMH and true or false
+    p.imbueNow = p.weapon and p.weapon.imbueNow
     p.secret = ns.inCombat() and C_Secrets and C_Secrets.ShouldUnitStatsBeSecret
         and ns.try(C_Secrets.ShouldUnitStatsBeSecret, "player") or false
     return p

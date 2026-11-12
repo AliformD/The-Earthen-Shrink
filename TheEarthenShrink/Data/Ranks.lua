@@ -156,10 +156,26 @@ ns.RANKS = {
         { id = 8030,  rank = 3, level = 26 }, { id = 16339, rank = 4, level = 36 },
         { id = 16341, rank = 5, level = 46 }, { id = 16342, rank = 6, level = 56 },
     } },
+    { key = "FB", name = "Frostbrand Weapon", kind = "imbue", ranks = {
+        { id = 8033,  rank = 1, level = 20 }, { id = 8038,  rank = 2, level = 28 },
+        { id = 10456, rank = 3, level = 38 }, { id = 16355, rank = 4, level = 48 },
+        { id = 16356, rank = 5, level = 58 },
+    } },
     { key = "WF", name = "Windfury Weapon", kind = "imbue", ranks = {
         { id = 8232,  rank = 1, level = 30 }, { id = 8235,  rank = 2, level = 40 },
         { id = 10486, rank = 3, level = 50 }, { id = 16362, rank = 4, level = 60 },
     } },
+}
+
+-- Built-in imbue numbers, used only when the game's tooltip can't be read.
+-- ONLY numbers someone has seen in Forever go here, with where they came from.
+ns.IMBUE_FALLBACK = {
+    WF = {
+        -- Angel read this rank 1 tooltip in game on 2026-11-12:
+        -- "Each hit has a 20% chance of granting you two extra attacks with
+        --  104 extra melee attack power."
+        [1] = { chance = 20, attacks = 2, ap = 104, source = "rank 1 tooltip seen in Forever, Nov 12" },
+    },
 }
 
 -- Quick lookups: ns.RANKS_BY_KEY.LB, ns.RANKS_BY_NAME["Lightning Bolt"]

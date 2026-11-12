@@ -19,7 +19,7 @@ match the `## Interface:` line at the top of both .toc files (currently 16001).
 
 | Tab | What it shows |
 |-----|---------------|
-| **Weapon Buffs** | Rockbiter, Flametongue and Windfury at the highest rank for your level, the DPS each one adds, and the math (hover a row). "Post to chat" puts a short summary in your chat box. |
+| **Weapon Buffs** | Rockbiter, Flametongue, Frostbrand and Windfury at the highest rank for your level. Each one is tested on 50 simulated main-hand swings with your real weapon, attack power and crit, and the one that adds the most damage is marked best. Shows extra damage per swing, over 50 swings, and DPS (hover a row for the math). Click the settings rows to say if Windfury Totem is in your group, whether it stacks with Windfury Weapon, and to try a Flametongue spell power bonus. "Post to chat" puts a short summary in your chat box. |
 | **Spell Efficiency** | Every damage spell and every rank (including Stormstrike and Lightning Shield): level, mana, % of your mana bar, damage, damage per mana and DPS. The best damage per mana is green. You can sort by spell or by damage per mana, and show ranks you can't learn yet. |
 | **Healing** | Every heal and every rank (Healing Wave, Lesser Healing Wave, Chain Heal, Riptide): mana, % of your mana, healing, healing per mana and healing per second. The most efficient useful rank gets a tick. |
 | **Totems** | Every totem at your level: cost, % of your mana, and its break-even: how many hits (Searing), enemies (Magma), or seconds (Healing Stream, Mana Spring) before it beats your best spell or heal. Also Fire Nova and Lightning Shield breakpoints, and Call of the Elements vs placing totems one by one. |
@@ -37,6 +37,10 @@ match the `## Interface:` line at the top of both .toc files (currently 16001).
 | `/es sound` (or `on` / `off`) | Turn the Windfury proc sound on or off (on by default) |
 | `/es sound test` | Test mode: prints what the game tells the addon, so you can see if Windfury procs are detected |
 | `/es sptooltip on` / `off` | Tell the addon whether your spell tooltips already include spell power |
+| `/es wftotem on` / `off` | Windfury Totem is (or isn't) in your group. Same as clicking the setting row |
+| `/es wfstack on` / `off` | Windfury Totem does (or doesn't) stack with Windfury Weapon |
+| `/es ftcoef 0.1` | Unverified: add 10% of your Fire spell power to each Flametongue hit |
+| `/es swings 50` | How many swings the weapon buff test uses |
 
 ## Where the numbers come from
 
@@ -52,6 +56,10 @@ match the `## Interface:` line at the top of both .toc files (currently 16001).
 - Crits: +50% for spells, +100% for melee
 - 14 attack power = 1 DPS
 - Flametongue's tooltip range covers 1.0 to 4.0 speed weapons
+- Flametongue gets 0% of your spell power (people say it gets some; not tested, so it's a setting)
+- Frostbrand procs about 9 times a minute when its tooltip doesn't give a chance
+- Windfury's extra attacks can't proc Windfury again; with the totem stacking, each rolls its own chance
+- If Rockbiter is on your weapon now, the addon takes its attack power out of your stats before testing
 - For inspected players: their base stats, attack power and crit are estimated from their level and gear
 
 **Not counted yet:** talents, and buffs on inspected players.

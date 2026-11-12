@@ -1,9 +1,16 @@
 -- The Earthen Shrink: weapon buff (imbue) math
 --
--- Works out how much DPS Rockbiter, Flametongue and Windfury add for one
--- character, using the highest rank they can have at their level.
--- The imbue numbers (attack power, fire damage, proc chance) come from the
--- game's own tooltip. The rules marked 🔶 are Classic placeholders.
+-- How it works (Angel's idea): pretend you swing your main-hand weapon 50
+-- times with your real attack power, weapon and crit. Work out the damage
+-- with no weapon buff, then with each buff, and see which adds the most.
+--
+-- We use the AVERAGE of those 50 swings (for example: 20% Windfury chance on
+-- 50 swings = 10 procs). A random roll would give a different answer every
+-- time you open the window, so the average is fairer for comparing.
+--
+-- The buff numbers (attack power, fire damage, proc chance) come from the
+-- game's own tooltip. Rules marked 🔶 are old Classic rules, not yet
+-- tested in Forever.
 
 local _, ns = ...
 local M = {}
@@ -14,11 +21,16 @@ M.RULES = {
     meleeMiss = 5,          -- 🔶 % miss chance vs a mob your level (hit gear lowers it)
     dodge = 5,              -- 🔶 % chance the mob dodges
     meleeCritBonus = 1.0,   -- 🔶 a melee crit does +100% damage
-    spellCritBonus = 0.5,   -- 🔶 a fire crit does +50% damage
+    spellCritBonus = 0.5,   -- 🔶 a fire/frost crit does +50% damage
     ftRefSpeed = 4.0,       -- 🔶 Flametongue tooltip max = a 4.0 speed weapon
+    fbPPM = 9,              -- 🔶 Frostbrand procs about 9 times a minute (if its tooltip has no %)
+    fbCoef = 0,             -- 🔶 share of Frost spell power Frostbrand adds (unknown, so 0)
 }
 
-M.ORDER = { "RB", "FT", "WF" }
+M.ORDER = { "RB", "FT", "FB", "WF" }
+M.SHORT = { RB = "Rockbiter", FT = "Flametongue", FB = "Frostbrand", WF = "Windfury" }
+
+local function db() return ns.db() end
 
 local function landChance(p)
     local R = M.RULES
@@ -26,73 +38,230 @@ local function landChance(p)
     return math.max(0, 1 - (miss + R.dodge) / 100)
 end
 
--- Returns { dps = number, math = { lines }, short = "one line formula" } or nil + reason.
-function M.Calc(key, rank, p)
-    local R, f = M.RULES, ns.fmt
-    if not rank then return nil, "not learned at this level" end
-    local im = rank.imbue
-    if not im then return nil, "couldn't read the tooltip" end
-    local w = p.weapon
-    if not (w and w.min and w.speed) then return nil, "no weapon found" end
+-- The numbers for one rank: from the tooltip, or the built-in list if the
+-- tooltip couldn't be read. Returns data, fromFallback.
+local function imbueData(key, rank)
+    if not rank then return nil end
+    if rank.imbue then return rank.imbue, false end
+    local fb = ns.IMBUE_FALLBACK and ns.IMBUE_FALLBACK[key] and ns.IMBUE_FALLBACK[key][rank.rank]
+    if fb then return fb, true end
+    return nil
+end
 
-    local land = landChance(p)
-    local meleeCrit = 1 + (p.meleeCrit or 0) / 100 * R.meleeCritBonus
-    local out = { lines = {} }
-    local L = out.lines
+-- Windfury Totem in your group: its proc numbers, or nil + why not.
+function M.TotemProc(p)
+    if not db().wfTotem then return nil, "off" end
+    local rank = ns.SpellData.Best("WFT", p.level or 1)
+    if not rank then return nil, "Windfury Totem isn't available at this level" end
+    if not rank.imbue then return nil, "couldn't read the Windfury Totem tooltip" end
+    return { chance = rank.imbue.chance, attacks = rank.imbue.attacks, ap = rank.imbue.ap, name = "Windfury Totem", rank = rank }
+end
+
+---------------------------------------------------------------------------
+-- One swing
+---------------------------------------------------------------------------
+
+-- Expected damage of ONE main-hand swing (including any extra attacks it
+-- gives you), with a buff described as:
+--   buff.ap     extra attack power (Rockbiter)
+--   buff.onHit  extra damage on every hit that lands (Flametongue, Frostbrand)
+--   buff.procs  list of { chance = %, attacks = n, ap = bonus AP } (Windfury)
+function M.Swing(p, ctx, buff)
+    local R, w = M.RULES, p.weapon
+    local avgW = (w.min + w.max) / 2
+    local land, crit = ctx.land, ctx.crit
+
+    -- One hit, on average (counts misses and crits).
+    local function hit(extraAP)
+        local ap = ctx.ap + (buff.ap or 0) + (extraAP or 0)
+        return land * ((avgW + ap / R.apPerDps * w.speed) * crit + (buff.onHit or 0))
+    end
+
+    local normal = hit(0)
+    local extra = 0
+    for _, pr in ipairs(buff.procs or {}) do
+        -- 🔶 Only a hit that lands can proc. Extra attacks can't proc again.
+        extra = extra + land * (pr.chance / 100) * pr.attacks * hit(pr.ap)
+    end
+    return normal + extra, normal, extra
+end
+
+-- "In 50 swings you'll usually get between 6 and 14 procs."
+local function luckRange(swings, land, chance)
+    local n, c = swings * land, chance / 100
+    local mean, sd = n * c, math.sqrt(n * c * (1 - c))
+    return math.max(0, math.floor(mean - 1.645 * sd)), math.ceil(mean + 1.645 * sd), mean
+end
+
+---------------------------------------------------------------------------
+-- Compare all buffs
+---------------------------------------------------------------------------
+
+-- Returns a list of { key, name, rank, calc, reason }, best first.
+-- calc = { dps, perSwing, total, lines, short, fromFallback }
+function M.Compare(p)
+    local R, f, set = M.RULES, ns.fmt, db()
+    local w = p.weapon
+    local list = {}
+    local swings = set.swings or 50
+    local haveWeapon = w and w.min and w.speed
+
+    local ctx
+    if haveWeapon then
+        ctx = { land = landChance(p), crit = 1 + (p.meleeCrit or 0) / 100 * R.meleeCritBonus, ap = p.ap or 0 }
+        ctx.fireCrit = 1 + (p.spellCrit or 0) / 100 * R.spellCritBonus
+        ctx.seconds = swings * w.speed
+        -- Rockbiter already on the weapon? Its attack power is inside your
+        -- stats, so take it out or every buff would get it for free.
+        if p.imbueNow == "RB" then
+            local rb = imbueData("RB", ns.SpellData.Best("RB", p.level or 1))
+            if rb and rb.ap then ctx.ap = math.max(0, ctx.ap - rb.ap); ctx.removedRB = rb.ap end
+        end
+        ctx.totem, ctx.totemWhy = M.TotemProc(p)
+        local none = { procs = {} }
+        if ctx.totem then none.procs[1] = ctx.totem end
+        ctx.base = M.Swing(p, ctx, none)
+    end
+    M.lastCtx = ctx
+
+    for _, key in ipairs(M.ORDER) do
+        local spell = ns.RANKS_BY_KEY[key]
+        local rank = ns.SpellData.Best(key, p.level or 1)
+        local e = { key = key, name = spell.name, rank = rank }
+        local data, fromFallback = imbueData(key, rank)
+        if not rank then
+            e.reason = "not learned at this level"
+        elseif not data then
+            e.reason = "couldn't read the numbers in its tooltip"
+        elseif not haveWeapon then
+            e.reason = "no weapon found"
+        else
+            e.calc = M.CalcOne(key, data, p, ctx)
+            e.calc.fromFallback = fromFallback
+        end
+        list[#list + 1] = e
+    end
+    table.sort(list, function(a, b)
+        local da, db_ = a.calc and a.calc.dps or -1, b.calc and b.calc.dps or -1
+        return da > db_
+    end)
+    return list
+end
+
+-- Builds the buff, runs the swing math and writes the explanation lines.
+function M.CalcOne(key, im, p, ctx)
+    local R, f, set, w = M.RULES, ns.fmt, db(), p.weapon
+    local swings = set.swings or 50
+    local buff = { procs = {} }
+    local L = {}
+    local short
 
     if key == "RB" then
-        -- Every hit does +AP÷14 × speed more damage, so per second it's AP÷14.
-        out.dps = im.ap / R.apPerDps * land * meleeCrit
+        buff.ap = im.ap
         L[#L + 1] = { "Attack power (tooltip)", "+" .. f(im.ap) }
-        L[#L + 1] = ("%s ÷ %s × %s%% land × %s crit = %s DPS"):format(
-            f(im.ap), f(R.apPerDps), f(land * 100), f(meleeCrit, 2), f(out.dps, 1))
-        out.short = ("+%sAP/14 x%d%%land x%.2fcrit"):format(f(im.ap), land * 100, meleeCrit)
+        short = ("+%sAP"):format(f(im.ap))
 
     elseif key == "FT" then
         -- 🔶 The tooltip shows a range for fast to slow weapons. We scale the
         -- top number by your weapon speed.
         local perHit = im.min == im.max and im.max or im.max * w.speed / R.ftRefSpeed
-        local fireCrit = 1 + (p.spellCrit or 0) / 100 * R.spellCritBonus
-        out.dps = perHit / w.speed * land * fireCrit
-        out.perHit = perHit
+        local sp = p.sp and p.sp.Fire or 0
+        local coef = set.ftCoef or 0
+        local fromSP = sp * coef
+        buff.onHit = (perHit + fromSP) * ctx.fireCrit
         L[#L + 1] = { "Fire damage (tooltip)", f(im.min, 1) .. " to " .. f(im.max, 1) }
         if im.min ~= im.max then
-            L[#L + 1] = ("%s × %s speed ÷ %s = %s per hit"):format(f(im.max, 1), f(w.speed, 2), f(R.ftRefSpeed, 1), f(perHit, 1))
+            L[#L + 1] = ("%s × %s speed ÷ %s = %s fire per hit"):format(f(im.max, 1), f(w.speed, 2), f(R.ftRefSpeed, 1), f(perHit, 1))
         end
-        L[#L + 1] = ("%s ÷ %s sec × %s%% land × %s crit = %s DPS"):format(
-            f(perHit, 1), f(w.speed, 2), f(land * 100), f(fireCrit, 2), f(out.dps, 1))
-        out.short = ("%.1f/hit / %.2fspd x%d%%land x%.2fcrit"):format(perHit, w.speed, land * 100, fireCrit)
+        L[#L + 1] = { "Spell power bonus |cffff8000(unverified)|r", ("%s × %s%% = +%s"):format(f(sp), f(coef * 100), f(fromSP, 1)) }
+        if im.sp then L[#L + 1] = { "Also gives spell power (spells only)", "+" .. f(im.sp) } end
+        short = ("%.1f fire/hit"):format(perHit + fromSP)
 
-    elseif key == "WF" then
-        -- A hit that lands has a chance to give extra attacks with bonus AP.
-        local avgW = (w.min + w.max) / 2
-        local extra = avgW + ((p.ap or 0) + im.ap) / R.apPerDps * w.speed
-        local procsPerSec = land * (im.chance / 100) / w.speed
-        out.dps = procsPerSec * im.attacks * extra * land * meleeCrit
+    elseif key == "FB" then
+        local chance = im.chance or (R.fbPPM * w.speed / 60 * 100)
+        local per = (im.min + im.max) / 2 + (p.sp and p.sp.Frost or 0) * R.fbCoef
+        buff.onHit = chance / 100 * per * ctx.fireCrit
+        L[#L + 1] = { "Frost damage (tooltip)", f(im.min, 1) .. (im.min ~= im.max and (" to " .. f(im.max, 1)) or "") }
+        L[#L + 1] = { "Proc chance" .. (im.chance and " (tooltip)" or " |cffff8000(guess)|r"), f(chance, 1) .. "%" }
+        short = ("%.0f%% x %.0f frost"):format(chance, per)
+    end
+
+    if key == "WF" then
+        buff.procs[#buff.procs + 1] = { chance = im.chance, attacks = im.attacks, ap = im.ap }
         L[#L + 1] = { "Proc chance (tooltip)", f(im.chance) .. "%" }
         L[#L + 1] = { "Extra attacks", f(im.attacks) .. (im.attacksGuessed and " (guess)" or "") }
-        L[#L + 1] = ("One extra hit: %s weapon + (%s AP + %s) ÷ 14 × %s = %s"):format(
-            f(avgW, 1), f(p.ap or 0), f(im.ap), f(w.speed, 2), f(extra, 1))
-        L[#L + 1] = ("%s%% × %s%% ÷ %s sec × %d × %s × %s%% × %s crit = %s DPS"):format(
-            f(land * 100), f(im.chance), f(w.speed, 2), im.attacks, f(extra, 1), f(land * 100), f(meleeCrit, 2), f(out.dps, 1))
-        out.short = ("%d%%x%dx%.0f/%.2fspd x%d%%land x%.2fcrit"):format(im.chance, im.attacks, extra, w.speed, land * 100, meleeCrit)
+        L[#L + 1] = { "Bonus AP on extra attacks", "+" .. f(im.ap) }
+        short = ("%d%% x%d +%dAP"):format(im.chance, im.attacks, im.ap)
     end
-    return out
+
+    -- Windfury Totem: works with every buff except (maybe) Windfury Weapon.
+    if ctx.totem then
+        if key ~= "WF" or set.wfStacks then
+            buff.procs[#buff.procs + 1] = ctx.totem
+            if key == "WF" then L[#L + 1] = { "Windfury Totem", "stacks (setting)" } end
+        else
+            L[#L + 1] = { "Windfury Totem", "|cffff4a3aturned off by this buff|r" }
+        end
+    end
+
+    local per = M.Swing(p, ctx, buff)
+    local c = { lines = L }
+    c.perSwing = per - ctx.base
+    c.total = c.perSwing * swings
+    c.dps = c.perSwing / w.speed
+    c.short = short
+
+    L[#L + 1] = ("%d swings (%s sec): no buff %s dmg, with %s %s dmg"):format(
+        swings, f(ctx.seconds), f(ctx.base * swings), M.SHORT[key], f(per * swings))
+    L[#L + 1] = { "Extra damage over " .. swings .. " swings", "+" .. f(c.total) }
+    L[#L + 1] = { "Extra per swing", "+" .. f(c.perSwing, 1) }
+    if key == "WF" then
+        local lo, hi, mean = luckRange(swings, ctx.land, im.chance)
+        L[#L + 1] = ("Average %s procs in %d swings. Real fights: usually %d to %d, so luck matters."):format(
+            f(mean, 1), swings, lo, hi)
+    end
+    return c
 end
 
--- Calculates all three for a profile and sorts best first.
--- Returns a list of { key, name, rank, calc, reason }.
-function M.Compare(p)
-    local list = {}
-    for _, key in ipairs(M.ORDER) do
-        local spell = ns.RANKS_BY_KEY[key]
-        local rank = ns.SpellData.Best(key, p.level or 1)
-        local calc, reason = M.Calc(key, rank, p)
-        list[#list + 1] = { key = key, name = spell.name, rank = rank, calc = calc, reason = reason }
+---------------------------------------------------------------------------
+-- Settings: /es wftotem, /es wfstack, /es ftcoef, /es swings
+---------------------------------------------------------------------------
+
+M.FT_COEF_STEPS = { 0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4 }
+
+function M.CycleFtCoef()
+    local set, steps = db(), M.FT_COEF_STEPS
+    local now = set.ftCoef or 0
+    for i, v in ipairs(steps) do
+        if v > now + 0.0001 then set.ftCoef = v; ns.refresh("settings"); return end
     end
-    table.sort(list, function(a, b)
-        local da, db = a.calc and a.calc.dps or -1, b.calc and b.calc.dps or -1
-        return da > db
-    end)
-    return list
+    set.ftCoef = steps[1]
+    ns.refresh("settings")
+end
+
+local function onOff(arg, current)
+    if arg == "on" or arg == "yes" then return true end
+    if arg == "off" or arg == "no" then return false end
+    return not current
+end
+
+function M.Slash(msg)
+    local set = db()
+    local cmd, arg = msg:match("^(%a+)%s*(.-)$")
+    if cmd == "wftotem" then
+        set.wfTotem = onOff(arg, set.wfTotem)
+        ns.say("Windfury Totem in your group: " .. (set.wfTotem and "|cff1eff00on|r" or "|cffff4a3aoff|r"))
+    elseif cmd == "wfstack" then
+        set.wfStacks = onOff(arg, set.wfStacks)
+        ns.say("Windfury Totem stacks with Windfury Weapon: " .. (set.wfStacks and "|cff1eff00yes|r" or "|cffff4a3ano|r"))
+    elseif cmd == "ftcoef" then
+        local v = tonumber(arg)
+        if v and v >= 0 and v <= 2 then set.ftCoef = v end
+        ns.say(("Flametongue spell power bonus: %s%% of Fire spell power (unverified). Example: /es ftcoef 0.1 = 10%%."):format(ns.fmt((set.ftCoef or 0) * 100, 1)))
+    elseif cmd == "swings" then
+        local v = tonumber(arg)
+        if v and v >= 10 and v <= 1000 then set.swings = math.floor(v) end
+        ns.say("swings simulated: " .. (set.swings or 50))
+    end
+    ns.refresh("settings")
 end

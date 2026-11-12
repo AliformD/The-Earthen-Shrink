@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.4.0"
+ns.VERSION = "0.5.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -62,6 +62,18 @@ local DEFAULTS = {
     trainer = {},
     -- Play a sound when Windfury procs. Switch with /es sound.
     windfurySound = true,
+
+    -- Weapon buff comparison settings (change them on the Weapon Buffs tab).
+    -- Is a Shaman putting down Windfury Totem in your group?
+    wfTotem = false,
+    -- Do Windfury Totem and Windfury Weapon both work at once? The tooltip
+    -- says no, but a hotfix (Nov 2026) is changing it so they stack.
+    wfStacks = true,
+    -- 🔶 UNVERIFIED: how much of your Fire spell power Flametongue adds to
+    -- each hit (0.1 = 10%). 0 until someone tests it in Forever.
+    ftCoef = 0,
+    -- How many main-hand swings the comparison simulates.
+    swings = 50,
 }
 
 function ns.db()
@@ -144,9 +156,11 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.refresh("settings")
     elseif msg == "sound" or msg:match("^sound%s") then
         ns.Windfury.Slash(msg:match("^sound%s+(%a+)"))
+    elseif msg:match("^wftotem") or msg:match("^wfstack") or msg:match("^ftcoef") or msg:match("^swings") then
+        ns.ImbueMath.Slash(msg)
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es ftcoef 0.1, /es swings 50")
     end
 end

@@ -1,7 +1,9 @@
 -- The Earthen Shrink: Weapon Buffs tab
 --
--- Shows Rockbiter, Flametongue and Windfury at the highest rank for your
--- level, how much DPS each adds, and the math behind it.
+-- Shows Rockbiter, Flametongue, Frostbrand and Windfury at the highest rank
+-- for your level. Each one is tested on 50 simulated main-hand swings with
+-- your real gear (see Math/Imbues.lua), and the best is marked.
+-- Below that are the settings the math depends on (click to change).
 
 local _, ns = ...
 local W = ns.Widgets
@@ -9,31 +11,37 @@ local T = {}
 ns.Tabs = ns.Tabs or {}
 ns.Tabs.weapon = T
 
-local ICON = { RB = 136086, FT = 135814, WF = 136018 }   -- fallback icons if the game has none
+local ICON = { RB = 136086, FT = 135814, FB = "Interface\\Icons\\Spell_Frost_FrostBrand", WF = 136018 }   -- fallback icons if the game has none
 local f = function(...) return ns.fmt(...) end
 
 -- Rows for the buff comparison. Shared with the Inspect tab.
 function ns.ImbueRows(p, list)
-    local rows = { { header = "Weapon buffs at the highest rank for level " .. (p.level or "?") } }
+    local swings = ns.db().swings or 50
+    local rows = { { header = ("Weapon buffs: %d simulated swings, highest rank for level %s"):format(swings, p.level or "?") } }
     local top = list[1] and list[1].calc and list[1].calc.dps or 0
     for i, e in ipairs(list) do
         local c, r = e.calc, e.rank
         local best = i == 1 and c ~= nil
         local sub
         if r then
-            sub = ("Rank %d · learned at level %s%s"):format(r.rank, r.level or "?",
+            sub = ("Rank %d · level %s%s"):format(r.rank, r.level or "?",
                 r.levelSource == "guess" and " (guess)" or "")
+            if c then
+                sub = sub .. (" · +%s dmg in %d swings"):format(f(c.total), swings)
+                if c.fromFallback then sub = sub .. " · |cffff8000built-in numbers|r" end
+            end
         else
             sub = "Not available yet at this level"
         end
-        if r and not c then sub = sub .. " · " .. (e.reason or "") end
+        if r and not c then sub = sub .. " · |cffff8000" .. (e.reason or "") .. "|r" end
         rows[#rows + 1] = {
             icon = (r and r.icon) or ICON[e.key],
             name = e.name .. (best and "  |cff1eff00(best)|r" or ""),
             sub = sub,
-            cols = { r and ("Rank " .. r.rank) or "-", c and ("+" .. f(c.dps, 1)) or "-" },
+            cols = { c and ("+" .. f(c.perSwing, 1)) or "-", c and ("+" .. f(c.dps, 1)) or "-" },
             colColors = { nil, best and W.GREEN or W.WHITE },
-            meter = c and top > 0 and c.dps / top or nil,
+            meter = c and top > 0 and math.max(0, c.dps) / top or nil,
+            dim = not c,
             tooltip = function(tt)
                 tt:AddLine(e.name .. (r and ("  (Rank " .. r.rank .. ")") or ""), 1, 1, 1)
                 if r and r.desc then tt:AddLine(r.desc, 1, 0.82, 0, true) end
@@ -42,13 +50,67 @@ function ns.ImbueRows(p, list)
                     W.AddMath(tt, c.lines)
                     tt:AddLine(" ")
                     tt:AddDoubleLine("DPS added", "+" .. f(c.dps, 1), 1, 0.82, 0, 0.12, 1, 0)
+                    if c.fromFallback then
+                        W.AddNote(tt, "The game didn't give us this tooltip's text, so these numbers are the built-in ones (" ..
+                            (ns.IMBUE_FALLBACK[e.key][r.rank].source or "?") .. "). Type /es check to see what the game sent.")
+                    end
                 else
                     tt:AddLine("Can't calculate: " .. (e.reason or "?"), 1, 0.3, 0.2, true)
+                    if r and e.reason and e.reason:find("tooltip") then
+                        W.AddNote(tt, "The addon reads numbers out of the spell's tooltip text. Either the game hasn't sent the text yet (wait a few seconds), or the words are different from what we expect. Type /es check and send a screenshot of the chat so we can fix the reader.")
+                    end
                 end
-                W.AddNote(tt, "Numbers in the tooltip text come from the game. The 14 AP = 1 DPS, miss, dodge and crit rules are old Classic rules until we test them in Forever.")
+                W.AddNote(tt, "Each buff is tested on the same simulated swings with your weapon, attack power and crit. The 14 AP = 1 DPS, miss, dodge and crit rules are old Classic rules until we test them in Forever.")
             end,
         }
     end
+    return rows
+end
+
+-- Settings rows. Click one to change it.
+function ns.ImbueSettingRows(p)
+    local set, IM = ns.db(), ns.ImbueMath
+    local rows = { { header = "Settings (click a row to change it)" } }
+    local totem, why = IM.TotemProc(p)
+    rows[#rows + 1] = {
+        icon = (totem and totem.rank.icon) or "Interface\\Icons\\Spell_Nature_Windfury", name = "Windfury Totem in your group",
+        sub = set.wfTotem and (totem and ("On · %d%% chance, %d extra attack(s), +%d AP (tooltip)"):format(totem.chance, totem.attacks, totem.ap)
+            or ("|cffff8000On, but " .. (why or "?") .. "|r")) or "Off",
+        cols = { "", set.wfTotem and "On" or "Off" },
+        colColors = { nil, set.wfTotem and W.GREEN or W.GREY },
+        onClick = function() IM.Slash("wftotem") end,
+        tooltip = function(tt)
+            tt:AddLine("Windfury Totem in your group", 1, 1, 1)
+            tt:AddLine("Turn this on if a Shaman (you or someone else) keeps Windfury Totem down. Then every buff is tested with the totem's extra attacks too.", 1, 0.82, 0, true)
+            W.AddNote(tt, "Also: /es wftotem on or /es wftotem off")
+        end,
+    }
+    rows[#rows + 1] = {
+        icon = 136018, name = "Totem stacks with Windfury Weapon",
+        sub = set.wfStacks and "Yes · expected after the Nov 2026 hotfix" or "No · old rule: Windfury Weapon turns off the totem for you",
+        cols = { "", set.wfStacks and "Yes" or "No" },
+        colColors = { nil, set.wfStacks and W.GREEN or W.GREY },
+        onClick = function() IM.Slash("wfstack") end,
+        tooltip = function(tt)
+            tt:AddLine("Does Windfury Totem stack with Windfury Weapon?", 1, 1, 1)
+            tt:AddLine("The rank 1 tooltip says Windfury Weapon \"disables any benefit you personally receive from Windfury Totem\". A hotfix is changing that so both work. Only matters when Windfury Totem is on.", 1, 0.82, 0, true)
+            W.AddNote(tt, "Not tested in game yet: we assume each one rolls its own chance on every hit. Also: /es wfstack on|off")
+        end,
+    }
+    local coef = set.ftCoef or 0
+    rows[#rows + 1] = {
+        icon = 135814, name = "Flametongue spell power bonus",
+        sub = "|cffff8000Unverified|r · share of your Fire spell power added to each Flametongue hit",
+        cols = { "", f(coef * 100, 0) .. "%" },
+        colColors = { nil, coef > 0 and W.ORANGE or W.GREY },
+        onClick = function() IM.CycleFtCoef() end,
+        tooltip = function(tt)
+            tt:AddLine("Flametongue spell power bonus (unverified)", 1, 1, 1)
+            tt:AddLine("Players say Flametongue gets stronger with spell power, but nobody has shown the number for Forever yet. It's 0% until we test it. Click to try other values and see how the ranking changes.", 1, 0.82, 0, true)
+            tt:AddDoubleLine("Your Fire spell power", f(p.sp and p.sp.Fire or 0), 1, 0.82, 0, 1, 1, 1)
+            W.AddNote(tt, "Exact value: /es ftcoef 0.1 (= 10%)")
+        end,
+    }
     return rows
 end
 
@@ -100,14 +162,14 @@ function T.Build(page)
     local width = ns.UI.CONTENT_W
     page.chips = W.Chips(page, 3, width)
     for _, c in ipairs(page.chips) do c:SetParent(page) end
-    page.list = W.List(page, width, 330, { { title = "Rank", width = 60 }, { title = "+DPS", width = 70 } }, 2)
+    page.list = W.List(page, width, 330, { { title = "Per swing", width = 70 }, { title = "+DPS", width = 70 } }, 2)
     page.list.frame:SetPoint("TOPLEFT", 0, -52)
     page.list:SetNameTitle("Buff")
 
     page.note = W.Text(page, "GameFontDisableSmall", nil, "LEFT")
     page.note:SetPoint("BOTTOMLEFT", 0, 4)
     page.note:SetPoint("RIGHT", -170, 0)
-    page.note:SetText("Hover a row for the math. We assume you bought the highest rank for your level.")
+    page.note:SetText("Hover a row for the math. Click a setting to change it. We assume you bought the highest rank for your level.")
 
     page.post = W.Button(page, "Post to chat", 150)
     page.post:SetPoint("BOTTOMRIGHT", 0, 0)
@@ -127,9 +189,11 @@ function T.Update(page)
     page.chips[3]:Set("Main hand", w and w.min and (f(w.min) .. "-" .. f(w.max) .. " @ " .. f(w.speed or 0, 2)) or "no weapon")
 
     local rows = ns.ImbueRows(p, list)
-    if p.hasImbueNow then
-        rows[#rows + 1] = { header = "Note: a weapon buff is on now. If it's Rockbiter, its AP is already in your stats." }
+    local ctx = ns.ImbueMath.lastCtx
+    if ctx and ctx.removedRB then
+        rows[#rows + 1] = { header = ("Rockbiter is on now: took its %d AP out of your stats for the test"):format(ctx.removedRB) }
     end
+    for _, r in ipairs(ns.ImbueSettingRows(p)) do rows[#rows + 1] = r end
     for _, r in ipairs(ns.ProfileRows(p)) do rows[#rows + 1] = r end
     page.list:SetRows(rows)
 
