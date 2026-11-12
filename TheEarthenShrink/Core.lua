@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.11.0"
+ns.VERSION = "0.11.1"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -72,7 +72,8 @@ local DEFAULTS = {
     -- Sim Lab: how you play ("enh", "ele" or "resto"), fight length in
     -- seconds, and whether Flame Shock is part of your mix.
     simStyle = "enh",
-    simFight = 60,
+    -- Fight length in seconds (10 to 30: solo questing, Angel 2026-11-12).
+    simFight = 20,
     -- Who the Sim Lab fights: "same" (a mob your level) or "boss" (+3 levels).
     simTarget = "same",
     simUseFlameShock = true,

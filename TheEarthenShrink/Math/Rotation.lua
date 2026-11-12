@@ -65,7 +65,13 @@ function R.Style()
 end
 
 -- How long a fight lasts, in seconds. Longer fights = mana matters more.
-function R.FightSeconds() return ns.db().simFight or 60 end
+-- Angel (2026-11-12): solo mobs die in 10 to 30 sec, so that's the range.
+-- Older saved values (up to 300) are pulled back into it.
+R.FIGHT_MIN, R.FIGHT_MAX, R.FIGHT_STEP = 10, 30, 5
+function R.FightSeconds()
+    local v = tonumber(ns.db().simFight) or 20
+    return math.max(R.FIGHT_MIN, math.min(R.FIGHT_MAX, v))
+end
 
 ---------------------------------------------------------------------------
 -- Small helpers

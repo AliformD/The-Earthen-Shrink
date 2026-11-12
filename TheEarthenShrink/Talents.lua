@@ -75,6 +75,36 @@ local function viaTraits(name, unit)
     return nil
 end
 
+-- Every talent you have points in: list of { name, rank, max }.
+function TL.Owned()
+    local out = {}
+    if GetNumTalentTabs and GetNumTalents and GetTalentInfo then
+        for tab = 1, (ns.try(GetNumTalentTabs) or 0) do
+            for i = 1, (ns.try(GetNumTalents, tab) or 0) do
+                local name, _, _, _, rank, maxRank = ns.try(GetTalentInfo, tab, i)
+                if name and (rank or 0) > 0 then out[#out + 1] = { name = name, rank = rank, max = maxRank } end
+            end
+        end
+        if #out > 0 then return out end
+    end
+    local config, trees = configAndTrees("player")
+    if not config then return out end
+    for _, tree in ipairs(trees) do
+        for _, node in ipairs(ns.try(C_Traits.GetTreeNodes, tree) or {}) do
+            local n = ns.try(C_Traits.GetNodeInfo, config, node)
+            local entry = type(n) == "table" and n.activeEntry and n.activeEntry.entryID
+            local rank = type(n) == "table" and (n.activeRank or n.currentRank) or 0
+            if entry and rank > 0 then
+                local e = ns.try(C_Traits.GetEntryInfo, config, entry)
+                local def = e and e.definitionID and ns.try(C_Traits.GetDefinitionInfo, e.definitionID)
+                local name = def and def.spellID and spellName(def.spellID)
+                if name then out[#out + 1] = { name = name, rank = rank, max = n.maxRanks } end
+            end
+        end
+    end
+    return out
+end
+
 -- The talent's tooltip text, or nil if the addon can't find it.
 function TL.Description(name)
     local _, _, id = viaTraits(name)

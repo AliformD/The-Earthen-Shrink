@@ -120,6 +120,93 @@ function H.RatingPerPercent(kind)
     return nil
 end
 
+-- The % bonus your rating gives right now (0 if no ratings in this game).
+function H.RatingBonus(kind)
+    local c = CR[kind]
+    if not c then return 0 end
+    local b = ns.clean(ns.try(GetCombatRatingBonus, _G[c[1]] or c[2]))
+    return (type(b) == "number" and b > 0) and b or 0
+end
+
+---------------------------------------------------------------------------
+-- Where your hit comes from
+---------------------------------------------------------------------------
+-- Angel (2026-11-12): Dwarves get hit for free, and almost every Shaman
+-- takes a Restoration talent that gives hit. We don't type those in: we
+-- read every talent you have points in and every passive spell you know,
+-- and keep the ones whose text says "chance to hit". The number comes from
+-- that text. The TOTAL always comes from the game (GetHitModifier), so
+-- even if we miss a piece here, the math still uses the right total.
+local function hitPct(text)
+    if type(text) ~= "string" then return nil end
+    local low = text:lower()
+    if not low:find("chance to hit") then return nil end
+    return tonumber(low:match("chance to hit[^%d]-by (%d+%.?%d*)%%")) or 0
+end
+
+local function spellDesc(id)
+    if not id then return nil end
+    return ns.clean(C_Spell and ns.try(C_Spell.GetSpellDescription, id) or ns.try(GetSpellDescription, id))
+end
+
+-- Passive spells in your spell book (racials are in the first tab).
+local function bookSpells()
+    local out = {}
+    if C_SpellBook and C_SpellBook.GetNumSpellBookSkillLines and C_SpellBook.GetSpellBookItemInfo then
+        local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player or 0
+        for line = 1, (ns.try(C_SpellBook.GetNumSpellBookSkillLines) or 0) do
+            local info = ns.try(C_SpellBook.GetSpellBookSkillLineInfo, line)
+            if type(info) == "table" and info.itemIndexOffset then
+                for i = info.itemIndexOffset + 1, info.itemIndexOffset + (info.numSpellBookItems or 0) do
+                    local it = ns.try(C_SpellBook.GetSpellBookItemInfo, i, bank)
+                    if type(it) == "table" and it.spellID then out[#out + 1] = { name = it.name, id = it.spellID } end
+                end
+            end
+        end
+    elseif GetNumSpellTabs and GetSpellTabInfo and GetSpellBookItemName then
+        for tab = 1, (ns.try(GetNumSpellTabs) or 0) do
+            local _, _, offset, num = ns.try(GetSpellTabInfo, tab)
+            for i = (offset or 0) + 1, (offset or 0) + (num or 0) do
+                local name, _, id = ns.try(GetSpellBookItemName, i, BOOKTYPE_SPELL or "spell")
+                if name then out[#out + 1] = { name = name, id = id } end
+            end
+        end
+    end
+    return out
+end
+
+-- Returns { total, parts = { { name, pct, kind, text } }, other }.
+-- kind = "talent", "racial/passive", "rating", "gear and other".
+function H.HitSources(p)
+    local parts, seen, sum = {}, {}, 0
+    for _, t in ipairs(ns.Talents and ns.Talents.Owned and ns.Talents.Owned() or {}) do
+        local text = ns.Talents.Description(t.name)
+        local pct = hitPct(text)
+        if pct and not seen[t.name] then
+            seen[t.name] = true
+            parts[#parts + 1] = { name = ("%s (%d/%s)"):format(t.name, t.rank, t.max or "?"), pct = pct, kind = "talent", text = text }
+            sum = sum + pct
+        end
+    end
+    for _, s in ipairs(bookSpells()) do
+        local text = spellDesc(s.id)
+        local pct = hitPct(text)
+        if pct and not seen[s.name] then
+            seen[s.name] = true
+            parts[#parts + 1] = { name = s.name, pct = pct, kind = "racial/passive", text = text }
+            sum = sum + pct
+        end
+    end
+    local hp = p and p.hitParts or {}
+    if (hp.rating or 0) > 0 then
+        parts[#parts + 1] = { name = "Hit rating on gear", pct = hp.rating, kind = "rating" }
+        sum = sum + hp.rating
+    end
+    local total = p and p.hit or 0
+    local other = total - sum
+    return { total = total, parts = parts, other = other }
+end
+
 ---------------------------------------------------------------------------
 -- Flurry
 ---------------------------------------------------------------------------
