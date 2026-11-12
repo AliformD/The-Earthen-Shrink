@@ -13,7 +13,7 @@ ns.Tabs = ns.Tabs or {}
 UI.SIDEBAR_W = 178
 UI.CONTENT_W = 692                                  -- width every tab builds its page for
 UI.WIDTH = UI.SIDEBAR_W + UI.CONTENT_W + 40
-UI.HEIGHT = 530                                    -- leaves every page 426 tall, same as before
+UI.HEIGHT = 542                                    -- leaves every page 426 tall, plus a strip for the resize grip
 
 -- The app's own icon (also used in the AddOn list and the round portrait).
 UI.APP_ICON = "Interface\\Icons\\Spell_Nature_Lightning"
@@ -30,6 +30,10 @@ local TAB_ORDER = {
 }
 
 local frame, current
+
+-- How big the window can be made with the corner grip (1 = normal size).
+UI.MIN_SCALE = 0.65
+UI.MAX_SCALE = 1.6
 
 ---------------------------------------------------------------------------
 -- One button on the left side: round icon in a bronze ring, gold name
@@ -85,6 +89,87 @@ local function sideButton(parent, t, i)
     end
     b:SetScript("OnClick", function() UI.Show(t.id) end)
     return b
+end
+
+---------------------------------------------------------------------------
+-- The resize grip in the bottom-right corner
+---------------------------------------------------------------------------
+-- Drag it to make the whole window bigger or smaller. Everything inside
+-- grows or shrinks together (like changing the UI scale for just this
+-- window), so the pages keep their layout and nothing can overlap.
+-- The top-left corner stays where it is while you drag.
+-- Double-click or right-click the grip to go back to normal size.
+
+local function clampScale(s)
+    local maxS = UI.MAX_SCALE
+    -- Never bigger than the screen.
+    local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
+    if sw and sh and sw > 0 and sh > 0 then
+        maxS = math.min(maxS, sw / UI.WIDTH, sh / UI.HEIGHT)
+    end
+    return math.max(UI.MIN_SCALE, math.min(maxS, s))
+end
+
+-- Changes the scale but keeps the top-left corner in the same spot.
+local function setScale(s)
+    s = clampScale(s)
+    local old = frame:GetScale() or 1
+    local left, top = frame:GetLeft(), frame:GetTop()
+    frame:SetScale(s)
+    if left and top then
+        frame:ClearAllPoints()
+        -- Positions are measured in the window's own scale, so convert.
+        frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left * old / s, top * old / s)
+    end
+    ns.db().windowScale = s
+end
+UI.SetScale = function(s) if frame then setScale(s) end end
+
+local function buildGrip()
+    local grip = CreateFrame("Button", nil, frame)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", -4, 4)
+    grip:SetFrameLevel((frame:GetFrameLevel() or 1) + 20)
+    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+
+    local startX, startY, startScale, startW, startH
+    local function cursor()
+        local x, y = GetCursorPosition()
+        local ui = UIParent:GetEffectiveScale() or 1
+        return x / ui, y / ui
+    end
+    grip:SetScript("OnMouseDown", function(self, mouse)
+        if mouse ~= "LeftButton" then return end
+        startX, startY = cursor()
+        startScale = frame:GetScale() or 1
+        startW, startH = UI.WIDTH * startScale, UI.HEIGHT * startScale
+        self:SetScript("OnUpdate", function()
+            local x, y = cursor()
+            -- How big the window would be if it followed the mouse; use
+            -- whichever of width or height grew more, so it keeps its shape.
+            local s = math.max((startW + x - startX) / UI.WIDTH, (startH + startY - y) / UI.HEIGHT)
+            setScale(s)
+        end)
+    end)
+    grip:SetScript("OnMouseUp", function(self)
+        self:SetScript("OnUpdate", nil)
+    end)
+    grip:SetScript("OnClick", function(_, mouse)
+        if mouse == "RightButton" then setScale(1) end
+    end)
+    grip:SetScript("OnDoubleClick", function() setScale(1) end)
+    grip:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Resize", 1, 1, 1)
+        GameTooltip:AddLine("Drag to make the window bigger or smaller.", 1, 0.82, 0, true)
+        GameTooltip:AddLine("Right-click: back to normal size.", 0.6, 0.6, 0.6, true)
+        GameTooltip:Show()
+    end)
+    grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    frame.grip = grip
 end
 
 local function build()
@@ -143,12 +228,17 @@ local function build()
     for i, t in ipairs(TAB_ORDER) do
         local page = CreateFrame("Frame", nil, frame)
         page:SetPoint("TOPLEFT", left, -94)
-        page:SetPoint("BOTTOMRIGHT", -12, 10)
+        page:SetPoint("BOTTOMRIGHT", -12, 22)   -- 22: keeps the resize grip clear of the page
         page:Hide()
         frame.pages[t.id] = page
         if ns.Tabs[t.id] then ns.Tabs[t.id].Build(page) end
         frame.buttons[t.id] = sideButton(side, t, i)
     end
+
+    buildGrip()
+    -- The size you picked last time.
+    local saved = tonumber(ns.db().windowScale)
+    if saved and saved ~= 1 then frame:SetScale(clampScale(saved)) end
 
     -- Version, bottom of the sidebar.
     local ver = W.Text(side, "GameFontDisableSmall", nil, "CENTER")

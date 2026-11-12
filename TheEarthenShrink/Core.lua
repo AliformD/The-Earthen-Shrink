@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.8.0"
+ns.VERSION = "0.9.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -95,6 +95,14 @@ local DEFAULTS = {
     -- Minimap button: where it sits (angle), and if it's hidden or locked.
     -- Change it by right-clicking the button, or with /es minimap.
     minimap = {},
+
+    -- Window size from the corner grip (1 = normal).
+    windowScale = 1,
+    -- Spells and Healing tabs: which spells are folded up, like
+    -- collapsed.spells.LB = true.
+    collapsed = {},
+    -- Sim Lab: which view is open ("spells", "weapon", "worth", "stats").
+    simView = "spells",
 }
 
 function ns.db()

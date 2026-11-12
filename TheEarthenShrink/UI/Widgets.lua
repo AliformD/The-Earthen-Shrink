@@ -35,6 +35,21 @@ function W.Text(parent, font, size, justify)
     return fs
 end
 
+-- Keeps a text on ONE line. If it's too long for its space it ends in
+-- "..." instead of wrapping onto the line below (that's what made text
+-- sit on top of other text).
+function W.OneLine(fs)
+    if fs.SetWordWrap then fs:SetWordWrap(false) end
+    if fs.SetNonSpaceWrap then fs:SetNonSpaceWrap(false) end
+    if fs.SetMaxLines then fs:SetMaxLines(1) end
+    return fs
+end
+
+-- True if the game had to cut the text short with "...".
+function W.IsCut(fs)
+    return fs and fs.IsTruncated and fs:IsTruncated() or false
+end
+
 function W.Button(parent, text, width)
     local b = W.Create("Button", nil, parent, { "UIPanelButtonTemplate" })
     b:SetSize(width or 120, 22)
@@ -69,9 +84,11 @@ function W.Chips(parent, count, width)
         c.label = W.Text(c, "GameFontDisableSmall", nil, "LEFT")
         c.label:SetPoint("TOPLEFT", 8, -6)
         c.label:SetPoint("RIGHT", -6, 0)
+        W.OneLine(c.label)
         c.value = W.Text(c, "GameFontHighlightLarge", nil, "LEFT")
         c.value:SetPoint("BOTTOMLEFT", 8, 6)
         c.value:SetPoint("RIGHT", -6, 0)
+        W.OneLine(c.value)
         function c:Set(label, value, color)
             self.label:SetText(label or "")
             self.value:SetText(value or "")
@@ -134,6 +151,10 @@ function W.List(parent, width, height, columns, meterAfter)
     L.nameTitle = nameTitle
 
     function L:SetNameTitle(s) self.nameTitle:SetText(s or "") end
+    -- Changes the column titles (for a list that shows different things).
+    function L:SetColumnTitles(titles)
+        for i, t in ipairs(self.headerTitles) do t:SetText(titles[i] or "") end
+    end
 
     local function makeRow(i)
         local r = CreateFrame("Button", nil, child)
@@ -163,10 +184,14 @@ function W.List(parent, width, height, columns, meterAfter)
         r.badge:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
         r.badge:Hide()
 
-        r.name = W.Text(r, "GameFontNormal", nil, "LEFT")
+        r.name = W.OneLine(W.Text(r, "GameFontNormal", nil, "LEFT"))
         r.name:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 8, 1)
-        r.sub = W.Text(r, "GameFontDisableSmall", nil, "LEFT")
+        r.sub = W.OneLine(W.Text(r, "GameFontDisableSmall", nil, "LEFT"))
         r.sub:SetPoint("BOTTOMLEFT", r.icon, "BOTTOMRIGHT", 8, -1)
+        -- Small text at the right end of the grey line (used by lists with
+        -- no columns, like the SP Test list).
+        r.subRight = W.Text(r, "GameFontHighlightSmall", nil, "RIGHT")
+        r.subRight:SetPoint("BOTTOMRIGHT", r, "BOTTOMRIGHT", -6, 4)
 
         r.cols = {}
         for c, col in ipairs(L.columns) do
@@ -192,6 +217,10 @@ function W.List(parent, width, height, columns, meterAfter)
         if leftCol then
             r.name:SetPoint("RIGHT", leftCol, "LEFT", -8, 0)
             r.sub:SetPoint("RIGHT", leftCol, "LEFT", -8, 0)
+        else
+            -- No columns: the name can use the whole row.
+            r.name:SetPoint("RIGHT", r, "RIGHT", -6, 0)
+            r.sub:SetPoint("RIGHT", r.subRight, "LEFT", -6, 0)
         end
 
         -- Section header look (used when a row is a title, not data)
@@ -199,14 +228,38 @@ function W.List(parent, width, height, columns, meterAfter)
         r.sectionIcon:SetSize(14, 14)
         r.sectionIcon:SetPoint("LEFT", 8, 0)
         r.sectionIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        r.section = W.Text(r, "GameFontNormalSmall", nil, "LEFT")
-        r.section:SetPoint("LEFT", 8, 0)
+        r.section = W.OneLine(W.Text(r, "GameFontNormalSmall", nil, "LEFT"))
         r.section:SetTextColor(0.6, 0.6, 0.6)
+        -- Grey text at the right of a section title ("6 ranks").
+        r.sectionRight = W.Text(r, "GameFontDisableSmall", nil, "RIGHT")
+        r.sectionRight:SetPoint("RIGHT", r, "RIGHT", -8, 0)
+        r.section:SetPoint("LEFT", 8, 0)
+        r.section:SetPoint("RIGHT", r.sectionRight, "LEFT", -6, 0)
+        -- The + / - box on a section you can fold up.
+        r.fold = r:CreateTexture(nil, "ARTWORK")
+        r.fold:SetSize(14, 14)
+        r.fold:SetPoint("LEFT", 6, 0)
+        r.fold:Hide()
 
         r:SetScript("OnEnter", function(self)
-            if not self.data or not self.data.tooltip then return end
+            local d = self.data
+            if not d then return end
+            local cutName, cutSub = not d.header and W.IsCut(self.name), not d.header and W.IsCut(self.sub)
+            if not d.tooltip and not d.foldable and not cutName and not cutSub then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            self.data.tooltip(GameTooltip)
+            if d.tooltip then
+                d.tooltip(GameTooltip)
+            elseif d.foldable then
+                GameTooltip:AddLine(d.header, 1, 1, 1)
+                GameTooltip:AddLine(d.collapsed and "Click to show its ranks." or "Click to hide its ranks.", 1, 0.82, 0, true)
+            elseif cutName then
+                GameTooltip:AddLine(self.name:GetText() or "", 1, 1, 1, true)
+            end
+            -- Text that didn't fit on the row is shown in full here.
+            if cutSub then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine(self.sub:GetText() or "", 0.6, 0.6, 0.6, true)
+            end
             GameTooltip:Show()
         end)
         r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -218,6 +271,9 @@ function W.List(parent, width, height, columns, meterAfter)
 
     -- rows = list of { header = "TEXT" } or
     --   { icon, name, sub, cols = {..}, colColors = {..}, meter = 0..1, selected, tooltip = fn(tt) }
+    -- A header can also have: headerIcon, headerRight = "grey text on the right",
+    -- foldable = true and collapsed = true/false (shows a + or - box; give it
+    -- an onClick that flips it).
     function L:SetRows(rows)
         local y = 0
         for i, data in ipairs(rows) do
@@ -231,10 +287,27 @@ function W.List(parent, width, height, columns, meterAfter)
             y = y + h
             local isHeader = data.header ~= nil
             r.section:SetText(isHeader and data.header:upper() or "")
-            r.section:ClearAllPoints()
-            r.section:SetPoint("LEFT", (isHeader and data.headerIcon) and 28 or 8, 0)
+            local foldable = isHeader and data.foldable and true or false
+            local x = foldable and 26 or 8
+            r.fold:SetShown(foldable)
+            if foldable then
+                r.fold:SetTexture(data.collapsed and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
+            end
+            r.sectionIcon:ClearAllPoints()
+            r.sectionIcon:SetPoint("LEFT", x, 0)
             r.sectionIcon:SetShown(isHeader and data.headerIcon ~= nil)
-            if isHeader and data.headerIcon then r.sectionIcon:SetTexture(data.headerIcon) end
+            if isHeader and data.headerIcon then r.sectionIcon:SetTexture(data.headerIcon); x = x + 20 end
+            r.section:ClearAllPoints()
+            r.section:SetPoint("LEFT", x, 0)
+            r.section:SetPoint("RIGHT", r.sectionRight, "LEFT", -6, 0)
+            r.sectionRight:SetText(isHeader and data.headerRight or "")
+            r.subRight:SetText(not isHeader and data.subRight or "")
+            if not isHeader and data.subRightColor then
+                local c = data.subRightColor
+                r.subRight:SetTextColor(c[1], c[2], c[3])
+            else
+                r.subRight:SetTextColor(1, 1, 1)
+            end
             r.badge:SetShown(not isHeader and data.badge and true or false)
             r.stripe:SetShown(not isHeader and i % 2 == 0)
             r.icon:SetShown(not isHeader)
@@ -268,6 +341,59 @@ function W.List(parent, width, height, columns, meterAfter)
     end
 
     return L
+end
+
+---------------------------------------------------------------------------
+-- Folding: spell groups you can hide (Spells and Healing tabs)
+---------------------------------------------------------------------------
+-- The folded state is saved, so it's the same next time you log in.
+-- tab = "spells" or "healing", key = the spell's short key like "LB".
+
+function W.IsFolded(tab, key)
+    local c = ns.db().collapsed
+    return c[tab] and c[tab][key] and true or false
+end
+
+function W.SetFolded(tab, key, on)
+    local c = ns.db().collapsed
+    c[tab] = c[tab] or {}
+    c[tab][key] = on and true or nil
+end
+
+-- Builds the rows for a list grouped by spell, with a header you can
+-- click to fold each spell. groups = { { key, name, icon, rows = {...}, best = true/false } }
+-- onToggle runs after a click (the tab redraws itself).
+function W.FoldedRows(tab, groups, onToggle)
+    local out = {}
+    for _, g in ipairs(groups) do
+        local folded = W.IsFolded(tab, g.key)
+        local n = #g.rows
+        out[#out + 1] = {
+            header = g.name, headerIcon = g.icon, foldable = true, collapsed = folded,
+            headerRight = (folded and g.best and "|cff1eff00best is in here|r  " or "")
+                .. n .. (n == 1 and " rank" or " ranks"),
+            onClick = function()
+                W.SetFolded(tab, g.key, not folded)
+                onToggle()
+            end,
+        }
+        if not folded then
+            for _, r in ipairs(g.rows) do out[#out + 1] = r end
+        end
+    end
+    return out
+end
+
+-- True if any of the groups is open (for a "Collapse all" button).
+function W.AnyOpen(tab, groups)
+    for _, g in ipairs(groups) do
+        if not W.IsFolded(tab, g.key) then return true end
+    end
+    return false
+end
+
+function W.FoldAll(tab, groups, on)
+    for _, g in ipairs(groups) do W.SetFolded(tab, g.key, on) end
 end
 
 ---------------------------------------------------------------------------

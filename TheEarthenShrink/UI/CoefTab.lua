@@ -19,9 +19,9 @@ local function tn(v) return ns.fmt(v, math.abs(v - math.floor(v + 0.5)) < 1e-6 a
 local RED = { 1, 0.29, 0.23 }
 local YELLOW = { 1, 0.82, 0 }
 local VERDICT = {
-    good  = { "Good: you can trust this number.", W.GREEN },
-    ok    = { "Okay: close. More hits will make it better.", YELLOW },
-    rough = { "Too rough: needs more hits or a bigger spell power change.", RED },
+    good  = { "Good: you can trust this.", W.GREEN },
+    ok    = { "Okay: more hits will help.", YELLOW },
+    rough = { "Too rough: add hits or more SP.", RED },
     wait  = { "", W.GREY },
 }
 
@@ -48,14 +48,17 @@ local function sampleBox(page, which, title, x, width)
         box:SetBackdropColor(0.02, 0.03, 0.04, 0.9)
     end
     box.which = which
-    box.title = W.Text(box, "GameFontNormal", nil, "LEFT")
-    box.title:SetPoint("TOPLEFT", 10, -8)
-    box.title:SetText(title)
-    box.state = W.Text(box, "GameFontDisableSmall", nil, "RIGHT")
+    -- The small "click to use" on the right, and the title to its left.
+    -- The title stops where the small text starts, so they can't overlap.
+    box.state = W.OneLine(W.Text(box, "GameFontDisableSmall", nil, "RIGHT"))
     box.state:SetPoint("TOPRIGHT", -10, -9)
+    box.title = W.OneLine(W.Text(box, "GameFontNormal", nil, "LEFT"))
+    box.title:SetPoint("TOPLEFT", 10, -8)
+    box.title:SetPoint("RIGHT", box.state, "LEFT", -6, 0)
+    box.title:SetText(title)
     box.body = W.Text(box, "GameFontHighlight", nil, "LEFT")
     box.body:SetPoint("TOPLEFT", 10, -28)
-    box.body:SetPoint("RIGHT", -10, 0)
+    box.body:SetPoint("BOTTOMRIGHT", -10, 28)   -- stops above the Clear button
     box.body:SetJustifyV("TOP")
     if box.body.SetSpacing then box.body:SetSpacing(2) end
 
@@ -92,6 +95,7 @@ local function buildEntry(page, x, width)
     local label = W.Text(box, "GameFontNormalSmall", nil, "LEFT")
     label:SetPoint("TOPLEFT", 10, -7)
     label:SetPoint("RIGHT", -10, 0)
+    W.OneLine(label)
     page.entryLabel = label
 
     local input = W.Create("EditBox", nil, box, { "InputBoxTemplate" })
@@ -143,7 +147,7 @@ local function buildEntry(page, x, width)
         T.Update(page)
     end)
 
-    page.msg = W.Text(box, "GameFontHighlightSmall", nil, "LEFT")
+    page.msg = W.OneLine(W.Text(box, "GameFontHighlightSmall", nil, "LEFT"))
     page.msg:SetPoint("BOTTOMLEFT", 10, 6)
     page.msg:SetPoint("RIGHT", -10, 0)
 
@@ -177,14 +181,31 @@ local function buildResult(page, x, width)
 
     page.big = W.Text(box, "GameFontHighlightLarge", 22, "LEFT")
     page.big:SetPoint("TOPLEFT", 10, -24)
-    page.verdict = W.Text(box, "GameFontNormal", nil, "LEFT")
+    page.verdict = W.OneLine(W.Text(box, "GameFontNormal", nil, "LEFT"))
     page.verdict:SetPoint("LEFT", page.big, "RIGHT", 12, 0)
     page.verdict:SetPoint("RIGHT", box, "RIGHT", -10, 0)
 
+    -- The explanation has its own space and stops above the buttons. If it's
+    -- too long, the rest is in the tooltip when you hover the box.
     page.body = W.Text(box, "GameFontHighlight", nil, "LEFT")
     page.body:SetPoint("TOPLEFT", 10, -54)
-    page.body:SetPoint("RIGHT", -10, 0)
+    page.body:SetPoint("BOTTOMRIGHT", -10, 56)
     page.body:SetJustifyV("TOP")
+    box:EnableMouse(true)
+    box:SetScript("OnEnter", function(self)
+        if not page.fullText or page.fullText == "" then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Result", 1, 1, 1)
+        for line in (page.fullText .. "\n"):gmatch("(.-)\n") do
+            if line ~= "" then GameTooltip:AddLine(line, 1, 0.82, 0, true) end
+        end
+        if page.savedFull then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(page.savedFull, 0.6, 0.6, 0.6, true)
+        end
+        GameTooltip:Show()
+    end)
+    box:SetScript("OnLeave", function() GameTooltip:Hide() end)
     if page.body.SetSpacing then page.body:SetSpacing(2) end
 
     page.save = W.Button(box, "Save for Sim Lab", 150)
@@ -198,11 +219,13 @@ local function buildResult(page, x, width)
         if T.target then ns.CoefTest.Forget(T.target); T.Update(page) end
     end)
     page.saved = W.Text(box, "GameFontHighlightSmall", nil, "LEFT")
-    page.saved:SetPoint("BOTTOMLEFT", 10, 13)
+    page.saved:SetPoint("BOTTOMLEFT", 10, 8)
     page.saved:SetPoint("RIGHT", page.forget, "LEFT", -8, 0)
+    page.saved:SetHeight(34)          -- room for 2 short lines, no more
+    page.saved:SetJustifyV("BOTTOM")
 
     -- Ticks in one cast (only for "over time" tests).
-    page.ticksLabel = W.Text(box, "GameFontHighlightSmall", nil, "RIGHT")
+    page.ticksLabel = W.OneLine(W.Text(box, "GameFontHighlightSmall", nil, "RIGHT"))
     page.ticksLabel:SetPoint("TOPRIGHT", -62, -9)
     local function tickButton(text, dx, delta)
         local b = W.Create("Button", nil, box, { "UIPanelButtonTemplate" })
@@ -223,15 +246,17 @@ function T.Build(page)
     local width = ns.UI.CONTENT_W
     T.page = page
     local listW = 226
-    page.list = W.List(page, listW, 426, { { title = "Saved", width = 46 } })
+    -- No columns: the saved number sits at the right of the grey line, so
+    -- long names like "Flametongue Weapon" get the whole row.
+    page.list = W.List(page, listW, 426, {})
     page.list.frame:SetPoint("TOPLEFT", 0, 0)
-    page.list:SetNameTitle("Spell to test")
+    page.list:SetNameTitle("Spell to test (saved result)")
 
     local x = listW + 8
     local right = width - x
     local half = (right - 6) / 2
     page.before = sampleBox(page, "before", "1. BEFORE", x, half)
-    page.after = sampleBox(page, "after", "2. AFTER (more spell power)", x + half + 6, half)
+    page.after = sampleBox(page, "after", "2. AFTER", x + half + 6, half)
     buildEntry(page, x, right)
     buildResult(page, x, right)
 end
@@ -266,7 +291,7 @@ end
 -- Update
 ---------------------------------------------------------------------------
 
-local function sampleText(s, stats, spNow, active, tip)
+local function sampleText(s, stats, spNow, active, tip, which)
     local lines = {}
     local sp = s.sp or (tip and tip.sp)
     lines[#lines + 1] = "Spell power: " .. (sp and f(sp) or (spNow and ("|cff999999" .. f(spNow) .. " (now)|r") or "?"))
@@ -274,12 +299,16 @@ local function sampleText(s, stats, spNow, active, tip)
         lines[#lines + 1] = "Tooltip: " .. (tip.min == tip.max and tn(tip.min) or (tn(tip.min) .. " to " .. tn(tip.max)))
             .. ((s.sp and tip.sp ~= s.sp) and (" |cff999999(at " .. f(tip.sp) .. " SP)|r") or "")
     end
-    lines[#lines + 1] = "Hits: " .. stats.n
     if stats.n > 0 then
-        lines[#lines + 1] = "Average: " .. f(stats.mean, 1)
+        lines[#lines + 1] = ("Hits: %d, average %s"):format(stats.n, f(stats.mean, 1))
         lines[#lines + 1] = "|cff999999From " .. f(stats.low) .. " to " .. f(stats.high) .. "|r"
-    elseif active then
-        lines[#lines + 1] = "|cff999999Read tooltip, or type hits.|r"
+    else
+        lines[#lines + 1] = "Hits: 0"
+        if which == "after" and not tip then
+            lines[#lines + 1] = "|cff999999Put on more spell power first.|r"
+        elseif active then
+            lines[#lines + 1] = "|cff999999Read tooltip, or type hits.|r"
+        end
     end
     return table.concat(lines, "\n")
 end
@@ -321,9 +350,9 @@ function T.Update(page)
         local n = #test.before.hits + #test.after.hits
         rows[#rows + 1] = {
             icon = x.rank.icon, name = x.spell.name,
-            sub = "Rank " .. x.rank.rank .. " · " .. (CT.PART_NAMES[x.part] or x.part) .. (n > 0 and (" · " .. n .. " hits") or ""),
-            cols = { saved and f(saved.total, 2) or "-" },
-            colColors = { saved and W.GREEN or W.GREY },
+            sub = "R" .. x.rank.rank .. " · " .. (CT.PART_NAMES[x.part] or x.part) .. (n > 0 and (" · " .. n .. " hits") or ""),
+            subRight = saved and f(saved.total, 2) or "-",
+            subRightColor = saved and W.GREEN or W.GREY,
             selected = x.id == T.selected, badge = saved ~= nil,
             onClick = function() T.selected = x.id; T.message = nil; T.Update(page) end,
             tooltip = function(tt)
@@ -338,7 +367,7 @@ function T.Update(page)
         }
     end
     if #list == 0 then
-        rows[#rows + 1] = { name = "No damage spells found", sub = "Try /es check", cols = { "" } }
+        rows[#rows + 1] = { name = "No damage spells found", sub = "Try /es check" }
     end
     page.list:SetRows(rows)
 
@@ -354,8 +383,8 @@ function T.Update(page)
     local active = CT.Active()
     local spNow = CT.CurrentSP(t)
     local res = CT.Result(t)
-    page.before.body:SetText(sampleText(test.before, res.before, active == "before" and spNow or nil, active == "before", test.tip_before))
-    page.after.body:SetText(sampleText(test.after, res.after, active == "after" and spNow or nil, active == "after", test.tip_after))
+    page.before.body:SetText(sampleText(test.before, res.before, active == "before" and spNow or nil, active == "before", test.tip_before, "before"))
+    page.after.body:SetText(sampleText(test.after, res.after, active == "after" and spNow or nil, active == "after", test.tip_after, "after"))
     paintBox(page.before, active == "before")
     paintBox(page.after, active == "after")
 
@@ -464,21 +493,28 @@ function T.Update(page)
             add("|cff999999Press Read tooltip on BEFORE and AFTER for a quicker, cleaner number.|r")
         end
     end
-    page.body:SetText(table.concat(lines, "\n"))
+    page.fullText = table.concat(lines, "\n")
+    page.body:SetText(page.fullText)
 
     -- Save
     local saved = CT.Saved(t.spell.key, t.rank.rank)[t.part]
     local canSave = best.verdict == "good" or best.verdict == "ok"
     if page.save.SetEnabled then page.save:SetEnabled(canSave) end
     page.forget:SetShown(saved ~= nil and not saved.seed)
+    -- Short text on the page; the long version is in the Result tooltip.
     if saved and saved.seed then
-        page.saved:SetText(("|cff1eff00Built in: %s ± %s|r (%s). Used by Spells and Sim Lab until you save your own."):format(
-            f(saved.total, 3), f(saved.totalMargin, 3), saved.note or "measured in Forever"))
+        page.saved:SetText(("|cff1eff00Built in: %s ± %s|r\nUsed until you save your own."):format(
+            f(saved.total, 3), f(saved.totalMargin, 3)))
+        page.savedFull = ("Built in: %s ± %s (%s). The Spells tab and Sim Lab use it until you save your own."):format(
+            f(saved.total, 3), f(saved.totalMargin, 3), saved.note or "measured in Forever")
     elseif saved then
         local how = saved.method == "tooltip" and "tooltip" or (("%d + %d hits"):format(saved.hitsBefore or 0, saved.hitsAfter or 0))
-        page.saved:SetText(("|cff1eff00Saved: %s ± %s|r (%s, %+d SP%s). Used by Spells and Sim Lab."):format(
-            f(saved.total, 3), f(saved.totalMargin, 3), how, saved.dSP or 0, saved.date and (", " .. saved.date) or ""))
+        page.saved:SetText(("|cff1eff00Saved: %s ± %s|r\n%s, %+d SP"):format(
+            f(saved.total, 3), f(saved.totalMargin, 3), how, saved.dSP or 0))
+        page.savedFull = ("Saved: %s ± %s (%s, %+d SP%s). The Spells tab and Sim Lab use it."):format(
+            f(saved.total, 3), f(saved.totalMargin, 3), how, saved.dSP or 0, saved.date and (", " .. saved.date) or "")
     else
-        page.saved:SetText(canSave and "Save it so the Spells tab and Sim Lab use it." or "")
+        page.saved:SetText(canSave and "Save it so Spells and\nSim Lab use it." or "")
+        page.savedFull = nil
     end
 end

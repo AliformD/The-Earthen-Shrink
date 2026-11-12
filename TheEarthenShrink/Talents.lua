@@ -27,12 +27,37 @@ local function spellName(id)
     return type(info) == "table" and info.name or nil
 end
 
-local function viaTraits(name)
-    if not (C_ClassTalents and C_ClassTalents.GetActiveConfigID and C_Traits and C_Traits.GetConfigInfo) then return nil end
-    local config = ns.try(C_ClassTalents.GetActiveConfigID)
-    local info = config and ns.try(C_Traits.GetConfigInfo, config)
-    if type(info) ~= "table" or type(info.treeIDs) ~= "table" then return nil end
-    for _, tree in ipairs(info.treeIDs) do
+-- The talent trees to look through. For YOUR talents that's your active
+-- set. For a player you just inspected the game uses a special set number
+-- (the same one Blizzard's own inspect window uses). 🔶 Untested in Forever.
+local INSPECT_CONFIG = Constants and Constants.TraitConsts and Constants.TraitConsts.INSPECT_TRAIT_CONFIG_ID or -1
+
+local function configAndTrees(unit)
+    if not (C_Traits and C_Traits.GetConfigInfo) then return nil end
+    local config
+    if unit and unit ~= "player" then
+        if C_Traits.HasValidInspectData and not ns.try(C_Traits.HasValidInspectData) then return nil end
+        config = INSPECT_CONFIG
+    else
+        config = C_ClassTalents and ns.try(C_ClassTalents.GetActiveConfigID)
+    end
+    if not config then return nil end
+    local info = ns.try(C_Traits.GetConfigInfo, config)
+    local trees = type(info) == "table" and type(info.treeIDs) == "table" and info.treeIDs or nil
+    -- Inspected players: if the set has no tree list, ask for their spec's tree.
+    if not trees and unit and unit ~= "player" and GetInspectSpecialization and C_ClassTalents and C_ClassTalents.GetTraitTreeForSpec then
+        local spec = ns.try(GetInspectSpecialization, unit)
+        local tree = spec and ns.try(C_ClassTalents.GetTraitTreeForSpec, spec)
+        if tree then trees = { tree } end
+    end
+    if not trees then return nil end
+    return config, trees
+end
+
+local function viaTraits(name, unit)
+    local config, trees = configAndTrees(unit)
+    if not config then return nil end
+    for _, tree in ipairs(trees) do
         for _, node in ipairs(ns.try(C_Traits.GetTreeNodes, tree) or {}) do
             local n = ns.try(C_Traits.GetNodeInfo, config, node)
             if type(n) == "table" and type(n.entryIDs) == "table" then
@@ -62,7 +87,10 @@ function TL.Description(name)
 end
 
 -- Points you have in a talent, or nil if the addon can't tell.
-function TL.Rank(name)
+-- unit = nil for you, or an inspected player's unit (only works right after
+-- the game sends their inspect data).
+function TL.Rank(name, unit)
+    if unit and unit ~= "player" then return viaTraits(name, unit) end
     local r, max = viaClassic(name)
     if r == nil then r, max = viaTraits(name) end
     return r, max
