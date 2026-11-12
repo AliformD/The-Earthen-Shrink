@@ -83,10 +83,7 @@ local function withSpellPower(avg, rank, coef, sp)
     return math.max(0, avg - inTip * coef) + (sp or 0) * coef
 end
 
-local function spellHitChance(q)
-    local M = ns.SpellMath.RULES
-    return math.min(M.maxSpellHit, M.baseSpellHit + (q.spellHit or 0)) / 100
-end
+local function spellHitChance(q) return ns.HitCrit.SpellHitChance(q) end
 
 local function spellCritMult(q)
     return 1 + (q.spellCrit or 0) / 100 * ns.SpellMath.RULES.spellCritBonus
@@ -116,7 +113,10 @@ local function meleeParts(q, opts, out)
     local list = IM.Compare(q)
     local ctx = IM.lastCtx
     if not ctx then return end
-    local swingDps = ctx.base / q.weapon.speed
+    -- Flurry (if you have it): crits make your next swings faster, so crit
+    -- also means MORE swings. 1 = no Flurry.
+    local flurry, fl = ns.HitCrit.FlurryFactor(q)
+    local swingDps = ctx.base / q.weapon.speed * flurry
     out[#out + 1] = {
         key = "melee", name = "Weapon swings", kind = "melee",
         icon = ns.try(GetInventoryItemTexture, "player", 16) or "Interface\\Icons\\INV_Axe_04",
@@ -125,6 +125,8 @@ local function meleeParts(q, opts, out)
             ("One swing every %s sec, %s%% land, crits counted"):format(f(q.weapon.speed, 2), f(ctx.land * 100)),
             ctx.totem and "Includes Windfury Totem in your group" or "",
             ctx.ftTotem and "Includes Flametongue Totem fire on each hit" or "",
+            fl and ("Flurry %d: +%s%% speed, on %s%% of the time = %s× swings%s"):format(fl.points, f(fl.pct),
+                f(fl.uptime * 100), f(flurry, 3), fl.fromText and "" or " 🔶") or "",
             { "DPS", f(swingDps, 1) },
         },
     }
@@ -135,7 +137,7 @@ local function meleeParts(q, opts, out)
     if pick then
         out[#out + 1] = {
             key = "imbue", name = pick.name, kind = "melee", imbueKey = pick.key,
-            icon = pick.rank and pick.rank.icon, dps = pick.calc.dps, mana = 0, every = q.weapon.speed,
+            icon = pick.rank and pick.rank.icon, dps = pick.calc.dps * flurry, mana = 0, every = q.weapon.speed,
             lines = pick.calc.lines,
             sub = pick.key == "FT" and "weapon buff · fire uses spell crit" or "weapon buff",
         }
@@ -352,9 +354,9 @@ R.WEIGHTS = {
       icon = "Interface\\Icons\\Spell_Nature_HealingTouch" },
     { key = "ap",   label = "Attack Power",    step = 20, pawn = "Ap",
       icon = "Interface\\Icons\\Ability_Warrior_BattleShout" },
-    { key = "crit", label = "Crit (1%)",       step = 1,  pawn = "CritRating", percent = true,
+    { key = "crit", label = "Crit chance (per 1%)", step = 1,  pawn = "CritRating", percent = true,
       icon = "Interface\\Icons\\Ability_CriticalStrike" },
-    { key = "hit",  label = "Hit (1%)",        step = 1,  pawn = "HitRating", percent = true,
+    { key = "hit",  label = "Hit chance (per 1%)",  step = 1,  pawn = "HitRating", percent = true,
       icon = "Interface\\Icons\\Ability_Marksmanship" },
     { key = "wdps", label = "Weapon DPS",      step = 2,  pawn = "Dps",
       icon = "Interface\\Icons\\INV_Sword_04" },

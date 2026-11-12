@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.10.0"
+ns.VERSION = "0.11.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -73,6 +73,8 @@ local DEFAULTS = {
     -- seconds, and whether Flame Shock is part of your mix.
     simStyle = "enh",
     simFight = 60,
+    -- Who the Sim Lab fights: "same" (a mob your level) or "boss" (+3 levels).
+    simTarget = "same",
     simUseFlameShock = true,
 
     -- Weapon buff comparison settings (change them on the Weapon Buffs tab).

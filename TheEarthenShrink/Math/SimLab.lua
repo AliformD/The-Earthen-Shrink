@@ -13,10 +13,9 @@ ns.SimMath = S
 
 S.RULES = {
     apPerStr = 2,             -- 🔶 1 Strength = 2 attack power for a Shaman
-    agiPerMeleeCrit = 20,     -- 🔶 20 Agility = 1% melee crit
+    -- Agility / Intellect per 1% crit: asked from the game, else the 🔶
+    -- Classic rule. See Math/HitCrit.lua (H.Conversions).
     manaPerInt = 15,          -- 🔶 1 Intellect = 15 mana
-    -- 🔶 Intellect for 1% spell crit: about 59.5 at level 60, less at low level.
-    intPerSpellCrit = function(level) return 10 + 49.5 * (level / 60) end,
     -- Mental Dexterity (Enhancement talent, 3 points): attack power from
     -- Intellect. Angel, in game 2026-11-12: 50% / 100% / 150% of Intellect
     -- for 1 / 2 / 3 points. A coming patch makes it 33% / 66% / 100%; the
@@ -142,8 +141,10 @@ S.STATS = {
     { key = "sp",   label = "Spell Power",    min = -60, max = 150, step = 1 },
     { key = "heal", label = "Healing",        min = -60, max = 150, step = 1 },
     { key = "ap",   label = "Attack Power",   min = -100, max = 300, step = 2 },
-    { key = "crit", label = "Crit",           min = -5, max = 10, step = 1, unit = "%" },
-    { key = "hit",  label = "Hit",            min = -5, max = 10, step = 1, unit = "%" },
+    { key = "crit", label = "Crit chance",    min = -5, max = 10, step = 1, unit = "%",
+      tip = "Extra chance to land a critical hit, in percentage points: +1 here takes you from 9.6% to 10.6%. In Forever gear crit counts for melee AND spells." },
+    { key = "hit",  label = "Hit chance",     min = -5, max = 10, step = 1, unit = "%",
+      tip = "Extra chance to hit (fewer misses), in percentage points. In Forever gear hit counts for melee AND spells. Past the hit cap it does nothing (see the Weights view)." },
 }
 
 function S.Empty()
@@ -183,12 +184,14 @@ function S.Apply(p, add, opts)
     if apFromStr ~= 0 then note(("%s Strength × %s = %s attack power"):format(f(add.str), f(R.apPerStr), f(apFromStr))) end
     if apFromInt ~= 0 then note(("%s Intellect × %s (Mental Dexterity, %d points) = %s attack power"):format(f(add.int), f(mdRatio, 2), md, f(apFromInt))) end
 
-    local critFromAgi = (add.agi or 0) / R.agiPerMeleeCrit
+    local conv = ns.HitCrit.Conversions(L)
+    q.target = ns.db().simTarget or "same"
+    local critFromAgi = (add.agi or 0) / conv.agi
     -- add.mcrit / add.scrit = melee-only / spell-only crit (used by the stat weights)
     q.meleeCrit = math.max(0, (p.meleeCrit or 0) + critFromAgi + (add.crit or 0) + (add.mcrit or 0))
-    if critFromAgi ~= 0 then note(("%s Agility ÷ %s = %s%% melee crit"):format(f(add.agi), f(R.agiPerMeleeCrit), f(critFromAgi, 2))) end
+    if critFromAgi ~= 0 then note(("%s Agility ÷ %s = %s%% melee crit"):format(f(add.agi), f(conv.agi, 1), f(critFromAgi, 2))) end
 
-    local intPerCrit = R.intPerSpellCrit(L)
+    local intPerCrit = conv.int
     local critFromInt = (add.int or 0) / intPerCrit
     q.spellCrit = math.max(0, (p.spellCrit or 0) + critFromInt + (add.crit or 0) + (add.scrit or 0))
     if critFromInt ~= 0 then note(("%s Intellect ÷ %s = %s%% spell crit"):format(f(add.int), f(intPerCrit, 1), f(critFromInt, 2))) end
@@ -218,8 +221,7 @@ function S.Melee(p)
     local IR = ns.ImbueMath.RULES
     local c = {}
     c.avg = (w.min + w.max) / 2 + (p.ap or 0) / IR.apPerDps * w.speed
-    local miss = math.max(0, IR.meleeMiss - (p.hit or 0))
-    c.land = math.max(0, 1 - (miss + IR.dodge) / 100)
+    c.land = ns.HitCrit.LandChance(p)
     c.critMult = 1 + (p.meleeCrit or 0) / 100 * IR.meleeCritBonus
     c.expected = c.avg * c.critMult * c.land
     c.dps = c.expected / w.speed
@@ -271,8 +273,21 @@ function S.ItemDelta(new, old, slot)
     if slot == 16 and new.wMin then
         weapon = { min = new.wMin, max = new.wMax, speed = new.wSpeed, name = new.name }
     end
-    -- Stats that don't change damage, shown as a note.
+    -- Crit / hit RATING (if Forever gear has it): turn into % if the game
+    -- tells us how much rating = 1%, else show it as a note.
     local other = {}
+    for _, k in ipairs({ "crit", "hit" }) do
+        local d = (new[k .. "Rating"] or 0) - (old[k .. "Rating"] or 0)
+        if d ~= 0 then
+            local per = ns.HitCrit.RatingPerPercent(k)
+            if per then
+                add[k] = add[k] + d / per
+            else
+                other[#other + 1] = ("%s%d %s rating (can't turn into %% yet)"):format(d > 0 and "+" or "", d, k)
+            end
+        end
+    end
+    -- Stats that don't change damage, shown as a note.
     for _, k in ipairs({ "sta", "spi" }) do
         local d = (new[k] or 0) - (old[k] or 0)
         if d ~= 0 then other[#other + 1] = (d > 0 and "+" or "") .. d .. (k == "sta" and " Stamina" or " Spirit") end

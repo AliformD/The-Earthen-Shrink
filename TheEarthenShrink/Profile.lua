@@ -63,8 +63,17 @@ function P.ReadItemLines(lines, into)
         add("heal", low:match("healing done by spells and effects by up to (%d+)") or low:match("^%+(%d+) healing")
             or low:match("increases healing done by up to (%d+)"))
         add("ap", low:match("attack power by (%d+)") or low:match("^%+(%d+) attack power"))
-        add("crit", low:match("critical strike by (%d+)%%"))
-        add("hit", low:match("chance to hit by (%d+)%%"))
+        -- Crit and hit as a %: "...critical strike by 1%" or "...critical
+        -- strike with spells by 1%". Forever combines melee and spell crit
+        -- (and hit), so both kinds count as one.
+        add("crit", low:match("critical strike[%a ]-by (%d+)%%"))
+        add("hit", low:match("chance to hit[%a ]-by (%d+)%%"))
+        -- 🔶 Or as a rating, in case Forever gear says "+14 Critical Strike
+        -- Rating" (sites disagree). Turned into % by the Sim Lab when the
+        -- game tells us how much rating = 1%.
+        add("critRating", low:match("critical strike rating by (%d+)") or low:match("^%+(%d+) critical strike rating")
+            or low:match("^%+(%d+) crit rating"))
+        add("hitRating", low:match("hit rating by (%d+)") or low:match("^%+(%d+) hit rating"))
         -- Weapon damage and speed: "35 - 66 Damage", "Speed 2.60"
         local a, b = l:match("^(%d+) %- (%d+)%s+%a*%s*Damage")
         if a and not into.wMin then into.wMin, into.wMax = tonumber(a), tonumber(b) end
