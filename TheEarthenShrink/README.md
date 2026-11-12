@@ -15,6 +15,19 @@ A Shaman helper for World of Warcraft: Forever. Type `/es` in game to open it.
 If it still doesn't show up, type `/dump select(4, GetBuildInfo())` in game. The number it prints must
 match the `## Interface:` line at the top of both .toc files (currently 16001).
 
+## Minimap button
+
+A round lightning icon sits on the edge of your minimap.
+
+- **Left-click**: open or close the window (same as `/es`).
+- **Right-click**: options: lock it in place, or hide it.
+- **Drag** (left mouse button): slide it around the minimap. The spot is saved.
+- Hidden it by mistake? Type `/es minimap` to bring it back, or `/es minimap reset` to put it back in its first spot.
+
+The addon is also listed in the game's addon list next to the minimap (the "addon compartment"), if your client shows one.
+
+In the AddOn list (character screen) the addon sits under its own **Shaman** heading.
+
 ## Tabs
 
 The sections are the round icon buttons down the left side of the window (like the Group Finder).
@@ -43,6 +56,8 @@ The sections are the round icon buttons down the left side of the window (like t
 | `/es ftstack on` / `off` | Flametongue Totem does (or doesn't) stack with Flametongue Weapon (unverified) |
 | `/es meter` | Prints what the game's damage meter tells addons (send a screenshot so we can read hits from it later) |
 | `/es inspect` | Inspect your target and open the Inspect tab |
+| `/es minimap` | Show or hide the minimap button |
+| `/es minimap reset` | Put the minimap button back in its first spot and unlock it |
 | `/es check` | Print what the addon could read from the game (helps find problems) |
 | `/es sound` (or `on` / `off`) | Turn the Windfury proc sound on or off (on by default) |
 | `/es sound test` | Test mode: prints what the game tells the addon, so you can see if Windfury procs are detected |

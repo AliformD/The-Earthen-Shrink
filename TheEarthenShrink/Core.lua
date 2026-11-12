@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.7.0"
+ns.VERSION = "0.8.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -91,6 +91,10 @@ local DEFAULTS = {
     coefSaved = {},
     coefTicks = {},
     coefActive = "before",
+
+    -- Minimap button: where it sits (angle), and if it's hidden or locked.
+    -- Change it by right-clicking the button, or with /es minimap.
+    minimap = {},
 }
 
 function ns.db()
@@ -189,9 +193,11 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.Windfury.Slash(msg:match("^sound%s+(%a+)"))
     elseif msg:match("^wftotem") or msg:match("^wfstack") or msg:match("^fttotem") or msg:match("^ftstack") or msg:match("^ftcoef") or msg:match("^swings") then
         ns.ImbueMath.Slash(msg)
+    elseif msg == "minimap" or msg:match("^minimap%s") then
+        ns.Minimap.Slash(msg:match("^minimap%s+(%a+)"))
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es changes, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es fttotem on|off, /es ftstack on|off, /es ftcoef 0.1, /es swings 50")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es changes, /es inspect, /es check, /es minimap, /es minimap reset, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es fttotem on|off, /es ftstack on|off, /es ftcoef 0.1, /es swings 50")
     end
 end

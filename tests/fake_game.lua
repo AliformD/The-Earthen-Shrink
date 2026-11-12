@@ -135,6 +135,13 @@ C_Item.GetItemIconByID = function() return 133000 end
 C_Item.GetItemStats = function() return {} end
 C_TooltipInfo.GetHyperlink = function(link) local id = link:match("item:(%d+)"); return ITEMS[id] and { lines = ITEMS[id].lines } end
 
+-- Fake minimap: 140 wide, centre at (1000, 700), scale 1.
+Minimap = newObj("Frame")
+Minimap.GetWidth = function() return 140 end
+Minimap.GetCenter = function() return 1000, 700 end
+Minimap.GetEffectiveScale = function() return 1 end
+MOUSE = { 1000, 800 }
+function GetCursorPosition() return MOUSE[1], MOUSE[2] end
 local ns = {}
 for line in io.lines(ADDON_DIR .. "/TheEarthenShrink.toc") do
   if not line:match("^##") and line:match("%S") then
@@ -559,3 +566,21 @@ assert(#ch == 1 and ch[1].label == "Stormstrike rank 1 tooltip")
 assert(#ns.GameCheck.Check(true) == 0, "reported once")
 SlashCmdList.THEEARTHENSHRINK("changes")
 print("hotfix check tests passed")
+
+-- Minimap button: click toggles the window, drag saves the angle, hide/show
+local mb = TheEarthenShrinkMinimapButton
+assert(mb, "minimap button made")
+local win = TheEarthenShrinkFrame
+win:Hide()
+mb._scripts.OnClick(mb, "LeftButton"); assert(win:IsShown(), "left-click opens")
+mb._scripts.OnClick(mb, "LeftButton"); assert(not win:IsShown(), "left-click closes")
+mb._scripts.OnDragStart(mb); mb._scripts.OnUpdate(mb); mb._scripts.OnDragStop(mb)
+assert(math.abs(ns.db().minimap.angle - 90) < 0.01, "dragged to top = 90 degrees")
+mb._scripts.OnClick(mb, "RightButton"); assert(TheEarthenShrinkMinimapMenu:IsShown(), "right-click menu")
+ns.db().minimap.lock = true; MOUSE = { 900, 700 }
+mb._scripts.OnDragStart(mb); assert(mb._scripts.OnUpdate == nil or ns.db().minimap.angle == 90, "locked")
+SlashCmdList.THEEARTHENSHRINK("minimap"); assert(not mb:IsShown() and ns.db().minimap.hide)
+SlashCmdList.THEEARTHENSHRINK("minimap"); assert(mb:IsShown() and not ns.db().minimap.hide)
+SlashCmdList.THEEARTHENSHRINK("minimap reset"); assert(ns.db().minimap.angle == 200 and not ns.db().minimap.lock)
+TheEarthenShrink_OnCompartmentClick("TheEarthenShrink", "LeftButton"); assert(win:IsShown(), "compartment opens")
+print("minimap button tests passed")
