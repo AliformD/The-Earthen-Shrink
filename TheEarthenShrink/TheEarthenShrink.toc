@@ -11,6 +11,7 @@ Core.lua
 Data/Ranks.lua
 Data/SpellData.lua
 Profile.lua
+Talents.lua
 Math/Spells.lua
 Math/Imbues.lua
 Math/Totems.lua

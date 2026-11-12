@@ -457,3 +457,27 @@ assert(CT.Save(LB))
 ns.UI.Update()
 dumpSim("stat weights")
 print("flametongue + stat weight tests passed")
+
+-- Mental Quickness -----------------------------------------------------------
+ns.db().simMentalQuick = nil
+assert(ns.SimMath.MentalQuickRank() == 0, "no talent API in the fake game -> 0")
+GetNumTalentTabs = function() return 1 end
+GetNumTalents = function() return 1 end
+GetTalentInfo = function() return "Mental Quickness", 0, 1, 1, 1, 5 end
+local r, from = ns.SimMath.MentalQuickRank()
+print("mental quickness from talents:", r, from)
+assert(r == 1 and from == "talents")
+local p0 = ns.Profile.Player()
+local q0 = ns.SimMath.Apply(p0, { int = 100 }, { mentalQuick = 1 })
+print("+100 Int with 1 point: SP", p0.sp.Nature, "->", q0.sp.Nature, "healing", p0.healing, "->", q0.healing)
+assert(math.abs(q0.sp.Nature - p0.sp.Nature - 15) < 1e-9 and math.abs(q0.healing - p0.healing - 15) < 1e-9)
+sim.mentalQuick._scripts.OnClick(sim.mentalQuick, "LeftButton")
+assert(ns.db().simMentalQuick == 2)
+sim.mentalQuick._scripts.OnClick(sim.mentalQuick, "RightButton")
+assert(ns.db().simMentalQuick == nil)
+ns.db().simMentalDex = true
+ns.UI.Update()
+print("button:", sim.mentalQuick._text)
+dumpSim("Mental Quickness 1 + Mental Dexterity")
+for _, row in ipairs(sim.list.rows) do if row._shown and row.data.name == "1 Intellect (compare)" then tlines = {}; row.data.tooltip(GameTooltip); for _, l in ipairs(tlines) do print("     tt: " .. l) end end end
+print("mental quickness tests passed")

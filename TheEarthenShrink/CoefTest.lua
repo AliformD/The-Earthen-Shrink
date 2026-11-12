@@ -297,6 +297,28 @@ function T.Weight(t, coef, p)
     return w
 end
 
+-- 1 Intellect, from the talents: spell power (Mental Quickness, valued with
+-- your best saved test) + attack power (Mental Dexterity). Mana and crit
+-- from Intellect are left out.
+function T.IntellectValue(p, opts, weights)
+    local S = ns.SimMath
+    local strDps = T.StrengthDps(p)
+    local int = { sp = S.RULES.mentalQuickSpPerIntPerRank * (opts.mentalQuick or 0), ap = 0, apDps = 0, spDps = 0 }
+    if opts.mentalDex then
+        int.ap = S.RULES.mentalDexApPerInt
+        local now = S.Melee(p)
+        local plus = S.Melee((S.Apply(p, { ap = int.ap })))
+        if now and plus then int.apDps = plus.dps - now.dps end
+    end
+    for _, w in ipairs(weights or T.Weights(p)) do
+        if not int.best or w.dps > int.best.dps then int.best = w end
+    end
+    if int.best then int.spDps = int.sp * int.best.dps end
+    int.dps = int.apDps + int.spDps
+    if strDps and strDps > 0 then int.strEq = int.dps / strDps end
+    return int
+end
+
 -- Every saved result you can use now, with its stat weight.
 function T.Weights(p)
     p = p or ns.Profile.Player()

@@ -64,6 +64,9 @@ local DEFAULTS = {
     windfurySound = true,
     -- Sim Lab: count Intellect as attack power (Mental Dexterity talent).
     simMentalDex = false,
+    -- Sim Lab: points in Mental Quickness (Intellect gives spell power).
+    -- nil = read it from your talents if the game lets us.
+    simMentalQuick = nil,
 
     -- Weapon buff comparison settings (change them on the Weapon Buffs tab).
     -- Is a Shaman putting down Windfury Totem in your group?

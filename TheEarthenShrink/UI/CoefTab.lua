@@ -75,6 +75,7 @@ local function sampleBox(page, which, title, x, width)
         GameTooltip:AddLine(which == "before"
             and "Your hits with the spell power you have now. Click here, then type the numbers."
             or "Your hits after you put on more spell power. Click here, then type the numbers.", 1, 0.82, 0, true)
+        GameTooltip:AddLine("The spell power here is the total the game reports, the same as your character sheet. Spell power from Intellect (Mental Quickness) is already in it, so Intellect on the gear you swap is counted.", 0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)
     box:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -373,7 +374,7 @@ function T.Update(page)
         page.big:SetTextColor(0.6, 0.6, 0.6)
         if res.before.n == 0 and res.after.n == 0 then
             add("|cffffd1001.|r Click BEFORE. Use " .. t.spell.name .. " on a mob and type " .. what .. ".")
-            add("|cffffd1002.|r Put on gear with more spell power. The more, the better.")
+            add("|cffffd1002.|r Put on gear with more spell power (Intellect counts too, with Mental Quickness).")
             add("|cffffd1003.|r Click AFTER and do the same.")
         else
             add(res.why)
