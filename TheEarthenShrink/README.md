@@ -34,6 +34,8 @@ match the `## Interface:` line at the top of both .toc files (currently 16001).
 | `/es healing` / `/es totems` | Open the Healing or Totems tab |
 | `/es inspect` | Inspect your target and open the Inspect tab |
 | `/es check` | Print what the addon could read from the game (helps find problems) |
+| `/es sound` (or `on` / `off`) | Turn the Windfury proc sound on or off (on by default) |
+| `/es sound test` | Test mode: prints what the game tells the addon, so you can see if Windfury procs are detected |
 | `/es sptooltip on` / `off` | Tell the addon whether your spell tooltips already include spell power |
 
 ## Where the numbers come from

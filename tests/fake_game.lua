@@ -167,3 +167,20 @@ C_TooltipInfo.GetTrainerService = function(i) return { id = 99001 } end
 fire("TRAINER_SHOW"); runTimers(); runTimers()
 SlashCmdList.THEEARTHENSHRINK("spells")
 dump("spells")
+-- Windfury sound test (the events here are FAKE; the real client is untested)
+SOUNDS = 0
+function GetTime() return (FAKE_TIME or 0) end
+function PlaySound(id, ch) SOUNDS = SOUNDS + 1; print("PlaySound", id, ch) end
+C_Spell.GetSpellName = function(id) return ({ [25584] = "Windfury Attack", [8232] = "Windfury Weapon" })[id] end
+SlashCmdList.THEEARTHENSHRINK("sound test")
+fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-1", 8232)   -- buffing the weapon: no sound
+FAKE_TIME = 10
+fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-2", 25584)  -- proc: sound
+fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-3", 25584)  -- same proc again: no 2nd sound
+FAKE_TIME = 14
+SlashCmdList.THEEARTHENSHRINK("sound")                         -- switch off
+fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-4", 25584)  -- off: no sound
+SlashCmdList.THEEARTHENSHRINK("sound on")
+SlashCmdList.THEEARTHENSHRINK("sound test")
+print("sounds played (expect 2: test + 1 proc):", SOUNDS)
+assert(SOUNDS == 2)

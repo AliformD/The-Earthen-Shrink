@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.3.0"
+ns.VERSION = "0.4.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -60,6 +60,8 @@ local DEFAULTS = {
     tooltipIncludesSpellPower = false,
     -- Ranks and levels learned from the class trainer window (real Forever data).
     trainer = {},
+    -- Play a sound when Windfury procs. Switch with /es sound.
+    windfurySound = true,
 }
 
 function ns.db()
@@ -140,9 +142,11 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.say("spell tooltips include spell power: " .. (db.tooltipIncludesSpellPower and "|cff1eff00yes|r" or "|cffff4a3ano|r")
             .. ". Change with /es sptooltip on or /es sptooltip off.")
         ns.refresh("settings")
+    elseif msg == "sound" or msg:match("^sound%s") then
+        ns.Windfury.Slash(msg:match("^sound%s+(%a+)"))
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es inspect, /es check, /es sptooltip on|off")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off")
     end
 end
