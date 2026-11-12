@@ -208,12 +208,13 @@ function M.CalcOne(key, im, p, ctx)
     local swings = set.swings or 50
     local buff = { procs = {} }
     local L = {}
-    local short
+    local short, plain, spPerDps
 
     if key == "RB" then
         buff.ap = im.ap
         L[#L + 1] = { "Attack power (tooltip)", "+" .. f(im.ap) }
         short = ("+%sAP"):format(f(im.ap))
+        plain = ("+%s attack power"):format(f(im.ap))
 
     elseif key == "FT" then
         local perHit, coef, tested, lines = M.FlametonguePerHit("FT", im, p)
@@ -221,6 +222,9 @@ function M.CalcOne(key, im, p, ctx)
         for _, l in ipairs(lines) do L[#L + 1] = l end
         if im.sp then L[#L + 1] = { "Also gives spell power (spells only)", "+" .. f(im.sp) } end
         short = ("%.1f fire/hit"):format(perHit)
+        plain = ("%s fire per hit"):format(f(perHit))
+        -- How much 1 more spell power adds (for "needs +N spell power").
+        spPerDps = coef > 0 and coef * ctx.fireCrit * ctx.land / w.speed or nil
 
     elseif key == "FB" then
         local chance = im.chance or (R.fbPPM * w.speed / 60 * 100)
@@ -229,6 +233,7 @@ function M.CalcOne(key, im, p, ctx)
         L[#L + 1] = { "Frost damage (tooltip)", f(im.min, 1) .. (im.min ~= im.max and (" to " .. f(im.max, 1)) or "") }
         L[#L + 1] = { "Proc chance" .. (im.chance and " (tooltip)" or " |cffff8000(guess)|r"), f(chance, 1) .. "%" }
         short = ("%.0f%% x %.0f frost"):format(chance, per)
+        plain = ("%s frost on %s%% of hits"):format(f(per), f(chance))
     end
 
     if key == "WF" then
@@ -237,6 +242,7 @@ function M.CalcOne(key, im, p, ctx)
         L[#L + 1] = { "Extra attacks", f(im.attacks) .. (im.attacksGuessed and " (guess)" or "") }
         L[#L + 1] = { "Bonus AP on extra attacks", "+" .. f(im.ap) }
         short = ("%d%% x%d +%dAP"):format(im.chance, im.attacks, im.ap)
+        plain = ("%s%% chance of %s extra attacks"):format(f(im.chance), f(im.attacks))
     end
 
     -- Flametongue Totem: adds its fire to every buff, except maybe
@@ -266,6 +272,8 @@ function M.CalcOne(key, im, p, ctx)
     c.total = c.perSwing * swings
     c.dps = c.perSwing / w.speed
     c.short = short
+    c.plain = plain          -- for the chat message: "+141 attack power"
+    c.spPerDps = spPerDps    -- Flametongue: DPS from 1 more spell power
 
     L[#L + 1] = ("%d swings (%s sec): no buff %s dmg, with %s %s dmg"):format(
         swings, f(ctx.seconds), f(ctx.base * swings), M.SHORT[key], f(per * swings))

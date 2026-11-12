@@ -806,3 +806,27 @@ local tt = { AddLine = function() end, AddDoubleLine = function() end }
 ns.Tabs.simlab.TalentTooltip(tt, "EW")
 ns.Tabs.simlab.TalentTooltip(tt, "SW")
 print("talent tooltip tests passed")
+
+-- Chat message: plain "why" sentence and the talents counted ----------------------
+THEIRS = { 0, 1, 0, 0, 2 }   -- Spirit Weapons 1, Mental Dexterity 2
+local kaz = ns.Profile.FromGear("target", { name = "Kaz", level = 28, classFile = "SHAMAN" })
+assert(kaz.mentalDex == 2 and kaz.apFromInt > 0, "their Mental Dexterity adds attack power")
+local msg = ns.Chat.Build(kaz, ns.ImbueMath.Compare(kaz))
+print("chat (inspect):", msg, #msg)
+assert(#msg <= 255 and msg:find("Why: ") and msg:find("wins, ") and (msg:find("Mental Dexterity 2") or msg:find("MD 2")) and (msg:find("no Elemental Weapons") or msg:find("EW 0")))
+local mine = ns.Chat.Build(ns.Profile.Player(), ns.ImbueMath.Compare(ns.Profile.Player()))
+print("chat (you):", mine, #mine)
+assert(#mine <= 255 and (mine:find("Elemental Weapons 2") or mine:find("EW 2")))
+local unk = ns.Profile.FromGear("target", { name = "Kaz", level = 28, classFile = "SHAMAN" })
+THEIRS = { 0, 0, 0, 0, 0 }
+unk = ns.Profile.FromGear("target", { name = "Kaz", level = 28, classFile = "SHAMAN" })
+local m3 = ns.Chat.Build(unk, ns.ImbueMath.Compare(unk))
+print("chat (unknown):", m3)
+assert(m3:find("Talents") and #m3 <= 255)
+-- Flametongue with a spell power share: says how much it needs
+ns.db().ftCoef = 0.1
+local m4 = ns.Chat.Build(ns.Profile.Player(), ns.ImbueMath.Compare(ns.Profile.Player()))
+print("chat (ft coef):", m4, #m4)
+assert(#m4 <= 255)
+ns.db().ftCoef = 0
+print("chat message tests passed")
