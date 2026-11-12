@@ -86,6 +86,44 @@ function P.ReadWeapon(unit)
              imbueNow = s.imbueNow }
 end
 
+-- The game's own stat list for an item. Only used to fill in Strength,
+-- Agility, Stamina, Intellect, Spirit, spell power and attack power when
+-- the tooltip text didn't give them.
+local STAT_KEYS = {
+    ITEM_MOD_STRENGTH_SHORT = "str", ITEM_MOD_AGILITY_SHORT = "agi", ITEM_MOD_STAMINA_SHORT = "sta",
+    ITEM_MOD_INTELLECT_SHORT = "int", ITEM_MOD_SPIRIT_SHORT = "spi",
+    ITEM_MOD_SPELL_POWER_SHORT = "sp", ITEM_MOD_ATTACK_POWER_SHORT = "ap",
+}
+
+local function fillFromGameStats(link, s)
+    if not (C_Item and C_Item.GetItemStats) then return end
+    local t = ns.try(C_Item.GetItemStats, link)
+    if type(t) ~= "table" then return end
+    for key, k in pairs(STAT_KEYS) do
+        local v = tonumber(ns.clean(t[key]))
+        if v and not s[k] then s[k] = v end
+    end
+end
+
+-- Stats of any item link (an item you don't own, from chat or a loot list).
+-- Returns the stats, and false if the game hasn't loaded the item yet.
+function P.LinkStats(link)
+    local data = C_TooltipInfo and C_TooltipInfo.GetHyperlink and ns.try(C_TooltipInfo.GetHyperlink, link)
+    local lines = linesOf(data)
+    local s = P.ReadItemLines(lines)
+    fillFromGameStats(link, s)
+    return s, #lines > 0
+end
+
+-- Stats of the item you are wearing in one slot ({} if the slot is empty).
+function P.ItemStats(unit, slot)
+    local link = ns.try(GetInventoryItemLink, unit, slot)
+    if not link then return {}, nil end
+    local s = P.ReadItemLines(itemLines(unit, slot, link))
+    fillFromGameStats(link, s)
+    return s, link
+end
+
 ---------------------------------------------------------------------------
 -- YOUR character (exact numbers from the game)
 ---------------------------------------------------------------------------

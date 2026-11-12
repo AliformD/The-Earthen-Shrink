@@ -115,6 +115,25 @@ C_Spell = {
   RequestLoadSpellData = function() end,
 }
 SlashCmdList = {}
+-- Sim Lab: shift-click hooks, dragging items, and reading item links.
+HOOKS = {}
+function hooksecurefunc(name, fn) HOOKS[name] = HOOKS[name] or {}; table.insert(HOOKS[name], fn) end
+function HandleModifiedItemClick() end
+function ChatEdit_InsertLink() end
+function IsModifiedClick() return true end
+function ClearCursor() CURSOR = nil end
+function GetCursorInfo() if CURSOR then return "item", 3, CURSOR end end
+function GetInventoryItemTexture() return 135000 end
+local ITEMS = {
+  ["3"] = { loc = "INVTYPE_HEAD", lines = { {leftText="Thinking Cap"}, {leftText="+17 Strength"}, {leftText="+4 Stamina"} } },
+  ["4"] = { loc = "INVTYPE_2HWEAPON", lines = { {leftText="Big Hammer"}, {leftText="80 - 120 Damage", rightText="Speed 3.40"}, {leftText="+10 Strength"} } },
+  ["5"] = { loc = "INVTYPE_FINGER", lines = { {leftText="Ring"}, {leftText="+5 Intellect"} } },
+  ["6"] = { loc = "INVTYPE_BAG", lines = { {leftText="Bag"} } },
+}
+C_Item.GetItemInfoInstant = function(link) local id = link:match("item:(%d+)"); return tonumber(id), "Armor", "Misc", ITEMS[id] and ITEMS[id].loc end
+C_Item.GetItemIconByID = function() return 133000 end
+C_Item.GetItemStats = function() return {} end
+C_TooltipInfo.GetHyperlink = function(link) local id = link:match("item:(%d+)"); return ITEMS[id] and { lines = ITEMS[id].lines } end
 
 local ns = {}
 for line in io.lines(ADDON_DIR .. "/TheEarthenShrink.toc") do
@@ -171,6 +190,58 @@ C_TooltipInfo.GetTrainerService = function(i) return { id = 99001 } end
 fire("TRAINER_SHOW"); runTimers(); runTimers()
 SlashCmdList.THEEARTHENSHRINK("spells")
 dump("spells")
+-- Sim Lab
+SlashCmdList.THEEARTHENSHRINK("sim")
+local sim = TheEarthenShrinkFrame.pages.simlab
+local function dumpSim(title)
+  print("=== simlab: " .. title)
+  print("item:", sim.itemName._text, "|", sim.itemSub._text)
+  local adds = {}
+  for _, st in ipairs(ns.SimMath.STATS) do adds[#adds+1] = st.key .. "=" .. tostring(sim.sliders[st.key].value._text) end
+  print("sliders:", table.concat(adds, " "))
+  for _, r in ipairs(sim.list.rows) do
+    if r._shown then
+      local cols = {}
+      for _, t in ipairs(r.cols) do cols[#cols+1] = tostring(t._text) end
+      print(r.data.header and ("-- " .. r.data.header) or (r.name._text .. " | " .. r.sub._text .. " | " .. table.concat(cols, " / ")))
+    end
+  end
+end
+dumpSim("nothing changed")
+sim.sliders.str:Set(17, true)
+dumpSim("+17 Strength from the slider")
+local melee
+for _, r in ipairs(sim.list.rows) do if r._shown and r.data.name == "Melee swing" then melee = r end end
+tlines = {}; melee.data.tooltip(GameTooltip); for _, l in ipairs(tlines) do print("     tt: " .. l) end
+sim.sliders.int.plus._scripts.OnClick()
+assert(ns.Tabs.simlab.add.int == 1, "plus button adds 1")
+sim.metric._scripts.OnClick()
+dumpSim("+1 Int by the + button, per mana")
+-- shift-click an item somewhere in the game
+for _, fn in ipairs(HOOKS.HandleModifiedItemClick) do fn("|cffffffff|Hitem:3::|h[Thinking Cap]|h|r") end
+for _, fn in ipairs(HOOKS.ChatEdit_InsertLink) do fn("|cffffffff|Hitem:3::|h[Thinking Cap]|h|r") end
+dumpSim("shift-clicked a hat: +17 Str vs the worn hat (+10 Int, 12 spell power)")
+assert(ns.Tabs.simlab.add.str == 17 and ns.Tabs.simlab.add.int == -10 and ns.Tabs.simlab.add.sp == -12)
+-- drop a weapon on the box
+CURSOR = "|cffffffff|Hitem:4::|h[Big Hammer]|h|r"
+sim.itemButton._scripts.OnReceiveDrag()
+sim.metric._scripts.OnClick()
+dumpSim("dropped a 2-hander, per second")
+assert(ns.Tabs.simlab.item.weapon and ns.Tabs.simlab.item.weapon.speed == 3.4)
+assert(ns.Tabs.simlab.add.str == 2, "hammer +10 Str vs axe +8 Str")
+for _, fn in ipairs(HOOKS.ChatEdit_InsertLink) do fn("|Hitem:5|h[Ring]|h") end
+sim.otherSlot._scripts.OnClick()
+dumpSim("ring, other slot")
+for _, fn in ipairs(HOOKS.ChatEdit_InsertLink) do fn("|Hitem:6|h[Bag]|h") end
+dumpSim("a bag")
+sim.mentalDex:SetChecked(true); ns.db().simMentalDex = true
+sim.clear._scripts.OnClick()
+dumpSim("cleared")
+-- Window closed: shift-clicks are ignored
+TheEarthenShrinkFrame:Hide()
+for _, fn in ipairs(HOOKS.ChatEdit_InsertLink) do fn("|Hitem:3|h[Thinking Cap]|h") end
+assert(ns.Tabs.simlab.item == nil, "ignored while closed")
+
 -- Windfury sound test (the events here are FAKE; the real client is untested)
 SOUNDS = 0
 function GetTime() return (FAKE_TIME or 0) end

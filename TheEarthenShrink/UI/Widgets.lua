@@ -292,3 +292,127 @@ function W.AddNote(tt, text)
     tt:AddLine(" ")
     tt:AddLine(text, 0.6, 0.6, 0.6, true)
 end
+
+---------------------------------------------------------------------------
+-- Stat slider: a label, the amount you added, and a slider with - and +
+---------------------------------------------------------------------------
+-- opts = { label, min, max, step, unit = "%" or nil, onChange = fn(value) }
+-- The slider starts at 0 (= your real stats). Left of the middle line takes
+-- stats away, right adds them. The coloured bar shows how far from 0 you are.
+
+function W.StatSlider(parent, width, opts)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(width, 36)
+    row.label = W.Text(row, "GameFontNormal", nil, "LEFT")
+    row.label:SetPoint("TOPLEFT", 2, -1)
+    row.label:SetText(opts.label)
+    row.value = W.Text(row, "GameFontHighlight", nil, "RIGHT")
+    row.value:SetPoint("TOPRIGHT", -2, -1)
+
+    local function stepButton(text)
+        local b = W.Create("Button", nil, row, { "UIPanelButtonTemplate" })
+        b:SetSize(20, 18)
+        b:SetText(text)
+        return b
+    end
+    row.minus = stepButton("-")
+    row.minus:SetPoint("BOTTOMLEFT", 0, 0)
+    row.plus = stepButton("+")
+    row.plus:SetPoint("BOTTOMRIGHT", 0, 0)
+
+    local s = CreateFrame("Slider", nil, row)
+    s:SetOrientation("HORIZONTAL")
+    s:SetHeight(16)
+    s:SetPoint("LEFT", row.minus, "RIGHT", 8, 0)
+    s:SetPoint("RIGHT", row.plus, "LEFT", -8, 0)
+    s:SetMinMaxValues(opts.min, opts.max)
+    s:SetValueStep(opts.step or 1)
+    if s.SetObeyStepOnDrag then s:SetObeyStepOnDrag(true) end
+    s:EnableMouseWheel(true)
+    row.slider = s
+
+    -- Track, the "0" line, and the coloured fill from 0 to the knob.
+    local track = s:CreateTexture(nil, "BACKGROUND")
+    track:SetPoint("LEFT"); track:SetPoint("RIGHT"); track:SetHeight(6)
+    track:SetColorTexture(0, 0, 0, 0.9)
+    local zero = s:CreateTexture(nil, "BORDER")
+    zero:SetSize(2, 12)
+    zero:SetColorTexture(1, 0.82, 0, 0.7)
+    local fill = s:CreateTexture(nil, "ARTWORK")
+    fill:SetHeight(6)
+    fill:Hide()
+    -- The knob. The game's own slider knob if this client has it, else a gold block.
+    local thumb = s:CreateTexture(nil, "OVERLAY")
+    if not (thumb.SetAtlas and thumb:SetAtlas("Minimal_SliderBar_Button")) then
+        thumb:SetColorTexture(1, 0.82, 0, 1)
+        thumb:SetSize(8, 16)
+    else
+        thumb:SetSize(20, 20)
+    end
+    s:SetThumbTexture(thumb)
+
+    local function xOf(v)
+        local w = s:GetWidth() or 0
+        return (v - opts.min) / (opts.max - opts.min) * w
+    end
+
+    local function show(v)
+        local unit = opts.unit or ""
+        if v > 0 then
+            row.value:SetText("|cff1eff00+" .. ns.fmt(v) .. unit .. "|r")
+        elseif v < 0 then
+            row.value:SetText("|cffff4a3a" .. ns.fmt(v) .. unit .. "|r")
+        else
+            row.value:SetText("|cff9999990" .. unit .. "|r")
+        end
+        local w = s:GetWidth() or 0
+        if w > 0 then
+            zero:ClearAllPoints()
+            zero:SetPoint("CENTER", s, "LEFT", xOf(0), 0)
+            fill:ClearAllPoints()
+            local a, b = xOf(math.min(0, v)), xOf(math.max(0, v))
+            fill:SetPoint("LEFT", s, "LEFT", a, 0)
+            fill:SetWidth(math.max(1, b - a))
+            if v > 0 then fill:SetColorTexture(0.12, 0.8, 0.1, 0.9) else fill:SetColorTexture(0.9, 0.2, 0.15, 0.9) end
+            fill:SetShown(v ~= 0)
+        end
+    end
+
+    local quiet = false   -- true while we move the slider ourselves (no callback)
+    s:SetScript("OnValueChanged", function(_, v)
+        local step = opts.step or 1
+        v = math.floor(v / step + 0.5) * step
+        show(v)
+        if not quiet and opts.onChange then opts.onChange(v) end
+    end)
+    s:SetScript("OnSizeChanged", function() show(row:Get()) end)
+    s:SetScript("OnMouseWheel", function(_, delta) row:Set(row:Get() + delta * (opts.step or 1), true) end)
+    row.minus:SetScript("OnClick", function() row:Set(row:Get() - (opts.step or 1), true) end)
+    row.plus:SetScript("OnClick", function() row:Set(row:Get() + (opts.step or 1), true) end)
+
+    function row:Get()
+        local step = opts.step or 1
+        return math.floor((s:GetValue() or 0) / step + 0.5) * step
+    end
+    -- notify = true runs onChange (a click); false is for code setting it.
+    function row:Set(v, notify)
+        v = math.max(opts.min, math.min(opts.max, v))
+        quiet = true
+        s:SetValue(v)
+        quiet = false
+        show(v)
+        if notify and opts.onChange then opts.onChange(v) end
+    end
+
+    if opts.tooltip then
+        s:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            opts.tooltip(GameTooltip)
+            GameTooltip:Show()
+        end)
+        s:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    s:SetValue(0)
+    show(0)
+    return row
+end

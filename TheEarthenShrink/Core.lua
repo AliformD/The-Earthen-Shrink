@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.5.0"
+ns.VERSION = "0.6.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -62,6 +62,8 @@ local DEFAULTS = {
     trainer = {},
     -- Play a sound when Windfury procs. Switch with /es sound.
     windfurySound = true,
+    -- Sim Lab: count Intellect as attack power (Mental Dexterity talent).
+    simMentalDex = false,
 
     -- Weapon buff comparison settings (change them on the Weapon Buffs tab).
     -- Is a Shaman putting down Windfury Totem in your group?
@@ -143,6 +145,8 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "" then
         ns.UI.Toggle()
+    elseif msg == "sim" or msg == "simlab" then
+        ns.UI.Show("simlab")
     elseif msg == "spells" or msg == "weapon" or msg == "inspect" or msg == "totems" or msg == "healing" then
         ns.UI.Show(msg)
         if msg == "inspect" then ns.Inspect.Start("target") end
@@ -161,6 +165,6 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es ftcoef 0.1, /es swings 50")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es ftcoef 0.1, /es swings 50")
     end
 end

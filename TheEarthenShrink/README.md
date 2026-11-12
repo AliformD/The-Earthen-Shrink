@@ -17,12 +17,15 @@ match the `## Interface:` line at the top of both .toc files (currently 16001).
 
 ## Tabs
 
+The sections are the round icon buttons down the left side of the window (like the Group Finder).
+
 | Tab | What it shows |
 |-----|---------------|
 | **Weapon Buffs** | Rockbiter, Flametongue, Frostbrand and Windfury at the highest rank for your level. Each one is tested on 50 simulated main-hand swings with your real weapon, attack power and crit, and the one that adds the most damage is marked best. Shows extra damage per swing, over 50 swings, and DPS (hover a row for the math). Click the settings rows to say if Windfury Totem is in your group, whether it stacks with Windfury Weapon, and to try a Flametongue spell power bonus. "Post to chat" puts a short summary in your chat box. |
 | **Spell Efficiency** | Every damage spell and every rank (including Stormstrike and Lightning Shield): level, mana, % of your mana bar, damage, damage per mana and DPS. The best damage per mana is green. You can sort by spell or by damage per mana, and show ranks you can't learn yet. |
 | **Healing** | Every heal and every rank (Healing Wave, Lesser Healing Wave, Chain Heal, Riptide): mana, % of your mana, healing, healing per mana and healing per second. The most efficient useful rank gets a tick. |
 | **Totems** | Every totem at your level: cost, % of your mana, and its break-even: how many hits (Searing), enemies (Magma), or seconds (Healing Stream, Mana Spring) before it beats your best spell or heal. Also Fire Nova and Lightning Shield breakpoints, and Call of the Elements vs placing totems one by one. |
+| **Sim Lab** | Try stats without wearing them. Each slider adds (or takes away) Strength, Agility, Intellect, Spell Power, Healing, Attack Power, Crit % or Hit %, and the list shows each spell's damage or healing now, with the change, and the difference. You can switch the list between per cast, per mana and per second. To try an item, open the Sim Lab and **shift-click** the item anywhere (bags, a chat link, a loot-list addon), or drop it on the box at the top. It's compared with what you wear in that slot and the sliders are set to the difference (a main-hand weapon also swaps the weapon damage). Tick **Mental Dexterity** if you have that talent, so Intellect counts as attack power. |
 | **Inspect** | Target another player and press **Inspect target**. It reads their gear and works out which weapon buff is best for them. "Post to chat" puts the result and the formula in your chat box. You pick the channel and press Enter. |
 
 ## Commands
@@ -32,6 +35,7 @@ match the `## Interface:` line at the top of both .toc files (currently 16001).
 | `/es` | Open or close the window |
 | `/es spells` | Open the Spell Efficiency tab |
 | `/es healing` / `/es totems` | Open the Healing or Totems tab |
+| `/es sim` | Open the Sim Lab |
 | `/es inspect` | Inspect your target and open the Inspect tab |
 | `/es check` | Print what the addon could read from the game (helps find problems) |
 | `/es sound` (or `on` / `off`) | Turn the Windfury proc sound on or off (on by default) |
