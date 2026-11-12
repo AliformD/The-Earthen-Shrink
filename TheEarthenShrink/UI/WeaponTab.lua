@@ -97,6 +97,41 @@ function ns.ImbueSettingRows(p)
             W.AddNote(tt, "Not tested in game yet: we assume each one rolls its own chance on every hit. Also: /es wfstack on|off")
         end,
     }
+    -- Flametongue Totem, and whether it stacks with Flametongue Weapon.
+    local ftt, fttWhy = IM.FtTotem(p)
+    local searing = ns.TotemMath.SearingDps(p)
+    local fttDps = ftt and p.weapon and p.weapon.speed and (ftt.perHit / p.weapon.speed) or nil
+    rows[#rows + 1] = {
+        icon = (ftt and ftt.rank.icon) or 136040, name = "Flametongue Totem in your group",
+        sub = set.ftTotem and (ftt and ("On · +%s fire per hit (about %s DPS)%s"):format(f(ftt.perHit, 1), f(fttDps, 1),
+                searing and (" · Searing Totem: " .. f(searing, 1) .. " DPS") or "")
+            or ("|cffff8000On, but " .. (fttWhy or "?") .. "|r")) or "Off",
+        cols = { "", set.ftTotem and "On" or "Off" },
+        colColors = { nil, set.ftTotem and W.GREEN or W.GREY },
+        onClick = function() IM.Slash("fttotem") end,
+        tooltip = function(tt)
+            tt:AddLine("Flametongue Totem in your group", 1, 1, 1)
+            tt:AddLine("Turn on if Flametongue Totem is down. Its fire is added to every swing. It takes the Fire totem spot, so compare it with Searing Totem.", 1, 0.82, 0, true)
+            if ftt then
+                W.AddMath(tt, ftt.lines)
+                tt:AddDoubleLine("Flametongue Totem (your swings)", f(fttDps, 1) .. " DPS", 1, 0.82, 0, 1, 1, 1)
+            end
+            if searing then tt:AddDoubleLine("Searing Totem (Totems tab)", f(searing, 1) .. " DPS", 1, 0.82, 0, 1, 1, 1) end
+            W.AddNote(tt, "Before misses and crits. Also: /es fttotem on|off")
+        end,
+    }
+    rows[#rows + 1] = {
+        icon = 135814, name = "Flametongue Totem stacks with the weapon buff",
+        sub = set.ftStacks and "Yes |cffff8000(unverified)|r · both add fire to every hit" or "No · the weapon buff replaces the totem's fire",
+        cols = { "", set.ftStacks and "Yes" or "No" },
+        colColors = { nil, set.ftStacks and W.GREEN or W.GREY },
+        onClick = function() IM.Slash("ftstack") end,
+        tooltip = function(tt)
+            tt:AddLine("Do Flametongue Totem and Flametongue Weapon stack?", 1, 1, 1)
+            tt:AddLine("Blizzard's notes say weapon buffs stack with totems, using Windfury as the example. Nobody has checked Flametongue yet. If both show fire numbers on the same swing in game, they stack.", 1, 0.82, 0, true)
+            W.AddNote(tt, "Only matters when Flametongue Totem is on. Also: /es ftstack on|off")
+        end,
+    }
     local coef = set.ftCoef or 0
     rows[#rows + 1] = {
         icon = 135814, name = "Flametongue spell power bonus",

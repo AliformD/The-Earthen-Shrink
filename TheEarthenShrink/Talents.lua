@@ -41,13 +41,24 @@ local function viaTraits(name)
                     local def = e and e.definitionID and ns.try(C_Traits.GetDefinitionInfo, e.definitionID)
                     if def and def.spellID and spellName(def.spellID) == name then
                         local active = n.activeEntry and n.activeEntry.entryID == entry
-                        return active and (n.activeRank or n.currentRank or 0) or 0, n.maxRanks
+                        return active and (n.activeRank or n.currentRank or 0) or 0, n.maxRanks, def.spellID
                     end
                 end
             end
         end
     end
     return nil
+end
+
+-- The talent's tooltip text, or nil if the addon can't find it.
+function TL.Description(name)
+    local _, _, id = viaTraits(name)
+    if not id and C_Spell and C_Spell.GetSpellIDForSpellIdentifier then
+        id = ns.try(C_Spell.GetSpellIDForSpellIdentifier, name)
+    end
+    if not id then return nil end
+    local text = C_Spell and ns.try(C_Spell.GetSpellDescription, id)
+    return ns.clean(text)
 end
 
 -- Points you have in a talent, or nil if the addon can't tell.

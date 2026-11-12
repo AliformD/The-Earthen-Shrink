@@ -74,6 +74,11 @@ local DEFAULTS = {
     -- Do Windfury Totem and Windfury Weapon both work at once? The tooltip
     -- says no, but a hotfix (Nov 2026) is changing it so they stack.
     wfStacks = true,
+    -- Is Flametongue Totem down in your group? And does it stack with
+    -- Flametongue Weapon? 🔶 Blizzard's notes say weapon buffs stack with
+    -- totems (Windfury was the example); not tested for Flametongue.
+    ftTotem = false,
+    ftStacks = true,
     -- 🔶 UNVERIFIED: how much of your Fire spell power Flametongue adds to
     -- each hit (0.1 = 10%). 0 until someone tests it in Forever.
     ftCoef = 0,
@@ -165,6 +170,8 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.UI.Show("simlab")
     elseif msg == "test" or msg == "sptest" or msg == "coef" then
         ns.UI.Show("coef")
+    elseif msg == "changes" then
+        ns.GameCheck.Print()
     elseif msg == "meter" then
         ns.CoefTest.DumpMeter()
     elseif msg == "spells" or msg == "weapon" or msg == "inspect" or msg == "totems" or msg == "healing" then
@@ -180,11 +187,11 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.refresh("settings")
     elseif msg == "sound" or msg:match("^sound%s") then
         ns.Windfury.Slash(msg:match("^sound%s+(%a+)"))
-    elseif msg:match("^wftotem") or msg:match("^wfstack") or msg:match("^ftcoef") or msg:match("^swings") then
+    elseif msg:match("^wftotem") or msg:match("^wfstack") or msg:match("^fttotem") or msg:match("^ftstack") or msg:match("^ftcoef") or msg:match("^swings") then
         ns.ImbueMath.Slash(msg)
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es ftcoef 0.1, /es swings 50")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es changes, /es inspect, /es check, /es sound, /es sound test, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es fttotem on|off, /es ftstack on|off, /es ftcoef 0.1, /es swings 50")
     end
 end

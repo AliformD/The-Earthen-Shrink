@@ -412,7 +412,7 @@ function T.IntellectValue(p, opts, weights)
     local strDps = T.StrengthDps(p)
     local int = { sp = S.RULES.mentalQuickSpPerIntPerRank * (opts.mentalQuick or 0), ap = 0, apDps = 0, spDps = 0 }
     if opts.mentalDex then
-        int.ap = S.RULES.mentalDexApPerInt
+        int.ap = S.MentalDexRatio()
         local now = S.Melee(p)
         local plus = S.Melee((S.Apply(p, { ap = int.ap })))
         if now and plus then int.apDps = plus.dps - now.dps end

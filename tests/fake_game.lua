@@ -517,3 +517,45 @@ local seed = CT.Saved("LB", 6).direct
 print("seed LB 6:", seed.coef, seed.totalMargin, seed.note)
 assert(seed.seed and math.abs(seed.coef - 0.7083) < 0.001)
 print("tooltip method tests passed")
+
+-- Flametongue Totem stacking, Stormstrike, game change check ---------------------
+SPELLS[8227] = { name="Flametongue Totem", rank=1, mana=50, cast=0, desc="Summons a Flametongue Totem. Party members' weapons deal 6 to 22 additional Fire damage per hit, based on the speed of the weapon. Lasts 2 min.", lvl=28 }
+SPELLS[77001].desc = "Instantly strike an enemy with both weapons for 150% weapon damage. Your next Lightning Bolt, Chain Lightning or Earth Shock deals 20% more damage."
+local oldTip = C_TooltipInfo.GetSpellByID
+C_TooltipInfo.GetSpellByID = function(id)
+  local d = oldTip(id)
+  if d and id == 77001 then table.insert(d.lines, { leftText = "Instant", rightText = "6 sec cooldown" }) end
+  return d
+end
+FAKE_SP = 64
+ns.SpellData.Rebuild()
+local function ftDps()
+  local out = {}
+  for _, e in ipairs(ns.ImbueMath.Compare(ns.Profile.Player())) do out[e.key] = e.calc and e.calc.dps end
+  return out
+end
+local off = ftDps()
+SlashCmdList.THEEARTHENSHRINK("fttotem on")
+local stack = ftDps()
+SlashCmdList.THEEARTHENSHRINK("ftstack off")
+local nostack = ftDps()
+print("FT weapon gain: totem off", off.FT, "totem stacks", stack.FT, "totem doesn't stack", nostack.FT)
+assert(math.abs(stack.FT - off.FT) < 1e-6, "stacking: the weapon adds the same on top")
+assert(nostack.FT < stack.FT, "not stacking: the weapon only replaces the totem")
+local fttT = ns.ImbueMath.FtTotem(ns.Profile.Player())
+print("FT totem per hit", fttT.perHit, "searing dps", ns.TotemMath.SearingDps(ns.Profile.Player()))
+SlashCmdList.THEEARTHENSHRINK("fttotem off"); SlashCmdList.THEEARTHENSHRINK("ftstack on")
+local ss = ns.SpellData.Best("SS", 30)
+print("Stormstrike", ss.strikePct, ss.cooldown)
+assert(ss.strikePct == 1.5 and ss.cooldown == 6)
+print("Mental Dexterity ratio", ns.SimMath.MentalDexRatio())
+-- game change check: first run saves, a hotfix changes Stormstrike, next login reports it
+ns.db().gameSnapshot = nil
+assert(#ns.GameCheck.Check(true) == 0)
+SPELLS[77001].desc = "Instantly strike an enemy with both weapons for 100% weapon damage. Your next Lightning Bolt, Chain Lightning or Earth Shock deals 20% more damage."
+ns.SpellData.Rebuild()
+local ch = ns.GameCheck.Check(true)
+assert(#ch == 1 and ch[1].label == "Stormstrike rank 1 tooltip")
+assert(#ns.GameCheck.Check(true) == 0, "reported once")
+SlashCmdList.THEEARTHENSHRINK("changes")
+print("hotfix check tests passed")

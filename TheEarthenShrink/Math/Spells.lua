@@ -199,9 +199,10 @@ function M.CalcShield(spell, rank, p)
 end
 
 -- Stormstrike weapon damage share. Used only if the tooltip doesn't give a %.
--- 1.0 = 100%. The Nov 2 beta notes raised it to 150%, but the 2026-11-10
--- hotfix put it back to 100% with an 8 sec cooldown (Angel, in game).
-M.RULES.strikePct = 1.0
+-- 1.5 = 150%. A hotfix was announced to put it back to 100% with an 8 sec
+-- cooldown, but on 2026-11-12 Angel still saw 150% and a 6 sec cooldown in
+-- game. The tooltip wins when the addon can read it.
+M.RULES.strikePct = 1.5
 
 -- Stormstrike: one weapon hit. (Its +20% on your next shock or bolt is not added here.)
 function M.CalcStrike(spell, rank, p)

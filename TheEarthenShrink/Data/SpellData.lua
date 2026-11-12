@@ -260,6 +260,12 @@ local function readRank(spell, id, rank, guessLevel)
     local lines = tooltipLines(id)
     rec.mana, rec.manaSource = manaCost(id, lines)
     rec.cast = castSeconds(info, lines)
+    for _, l in ipairs(lines) do
+        local cd = l:match(NUM .. " sec cooldown") or l:match(NUM .. " sec Cooldown")
+        if cd then rec.cooldown = tonumber(cd) end
+        local cdm = l:match(NUM .. " min cooldown") or l:match(NUM .. " min Cooldown")
+        if cdm then rec.cooldown = tonumber(cdm) * 60 end
+    end
     rec.level, rec.levelSource = levelFor(spell.name, rank, id, guessLevel)
     rec.known = isKnown(id)
 

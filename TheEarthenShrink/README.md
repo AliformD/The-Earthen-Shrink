@@ -38,6 +38,9 @@ The sections are the round icon buttons down the left side of the window (like t
 | `/es healing` / `/es totems` | Open the Healing or Totems tab |
 | `/es sim` | Open the Sim Lab |
 | `/es test` | Open the Spell Power Test |
+| `/es changes` | Checks the game values the addon watches (Stormstrike, Windfury, Rockbiter, and the Mental Dexterity / Mental Quickness talent text if readable) and lists any that changed since last time. This also runs by itself a few seconds after you log in, and only prints if something changed |
+| `/es fttotem on` / `off` | Flametongue Totem is (or isn't) in your group |
+| `/es ftstack on` / `off` | Flametongue Totem does (or doesn't) stack with Flametongue Weapon (unverified) |
 | `/es meter` | Prints what the game's damage meter tells addons (send a screenshot so we can read hits from it later) |
 | `/es inspect` | Inspect your target and open the Inspect tab |
 | `/es check` | Print what the addon could read from the game (helps find problems) |
@@ -59,6 +62,9 @@ The sections are the round icon buttons down the left side of the window (like t
 
 **Old Classic rules, used until we can test them in Forever** (all in `Math/Spells.lua` and `Math/Imbues.lua` under `RULES`, so they're easy to change):
 - Tooltips already include your spell power (Angel saw this in Forever), so the math takes that part out before adding spell power back. `/es sptooltip off` turns this off.
+- Stormstrike does 150% weapon damage if its tooltip doesn't say (Angel, 2026-11-12: the announced 100% hotfix isn't live yet)
+- Mental Dexterity gives 150% of Intellect as attack power if the talent text can't be read (same: the announced lower value isn't live yet)
+- Flametongue Totem stacks with Flametongue Weapon (a setting; Blizzard's notes say weapon buffs stack with totems, using Windfury as the example)
 - How much spell power each spell gets (cast time ÷ 3.5), and the penalty for ranks learned before level 20. **You can replace this with your own measured number on the SP Test tab.**
 - Damage over time ticks every 3 sec (so Flame Shock has 4 ticks). You can change the number of ticks on the SP Test tab
 - 96% base spell hit, 5% melee miss, 5% dodge

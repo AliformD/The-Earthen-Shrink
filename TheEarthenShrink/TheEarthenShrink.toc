@@ -20,6 +20,7 @@ Math/CoefTest.lua
 Chat.lua
 WindfuryAlert.lua
 CoefTest.lua
+GameCheck.lua
 UI/Widgets.lua
 UI/Window.lua
 UI/WeaponTab.lua
