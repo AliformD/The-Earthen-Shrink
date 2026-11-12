@@ -169,9 +169,13 @@ function M.CalcHeal(spell, rank, p)
     if rank.level and rank.level < R.lowLevelPenaltyStart then
         coef = coef * (1 - (R.lowLevelPenaltyStart - rank.level) * R.lowLevelPenaltyPerLevel)
     end
-    local bonus = ns.db().tooltipIncludesSpellPower and 0 or (p.healing or 0)
-    local c = { coef = coef, bonus = bonus, time = cast, mana = rank.mana }
-    c.avgBase = (h.min + h.max) / 2
+    -- Forever's tooltips already include your healing bonus. Take that part
+    -- out first, then add the healing of the profile we're working out, so
+    -- the Sim Lab's Healing slider changes it (it didn't before v0.10).
+    local inTip = ns.db().tooltipIncludesSpellPower and (rank.healRead or p.healingNow or 0) or 0
+    local bonus = p.healing or 0
+    local c = { coef = coef, bonus = bonus, inTip = inTip, time = cast, mana = rank.mana }
+    c.avgBase = math.max(0, (h.min + h.max) / 2 - inTip * coef)
     c.expected = (c.avgBase + bonus * coef) * (1 + (p.spellCrit or 0) / 100 * R.healCritBonus) + (h.hot or 0)
     c.hpm = c.expected / rank.mana
     c.hps = c.expected / cast

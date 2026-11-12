@@ -250,6 +250,7 @@ local function dumpSim(title)
     end
   end
 end
+ns.Tabs.simlab.SetView("spells")
 dumpSim("nothing changed")
 sim.sliders.str:Set(17, true)
 dumpSim("+17 Strength from the slider")
@@ -277,7 +278,7 @@ sim.otherSlot._scripts.OnClick()
 dumpSim("ring, other slot")
 for _, fn in ipairs(HOOKS.ChatEdit_InsertLink) do fn("|Hitem:6|h[Bag]|h") end
 dumpSim("a bag")
-sim.mentalDex:SetChecked(true); ns.db().simMentalDex = true
+ns.SimMath.SetTalentPoints("MD", 3)
 sim.clear._scripts.OnClick()
 dumpSim("cleared")
 -- Weapon buff view: does a lot of spell power make Flametongue the best?
@@ -305,7 +306,57 @@ SlashCmdList.THEEARTHENSHRINK("ftcoef 0")
 sim.clear._scripts.OnClick()
 ns.Tabs.simlab.SetView("stats")
 dumpSim("stats view")
-ns.Tabs.simlab.SetView("worth")
+-- Total view: the whole mix, now vs with changes
+ns.Tabs.simlab.SetView("total")
+dumpSim("total view, nothing changed")
+sim.sliders.str:Set(20, true)
+dumpSim("total view, +20 Str")
+local totalRow = sim.list.rows[2]
+assert(totalRow.data.name:find("all together"), "first row is the total")
+assert(totalRow.cols[3]._text:find("^%+"), "more Strength = more total DPS")
+sim.clear._scripts.OnClick()
+-- Weights view: one number per stat, Strength = 1
+ns.Tabs.simlab.SetView("weights")
+dumpSim("weights view")
+local W8 = ns.Tabs.simlab.lastWeights
+assert(math.abs(W8.rows.str.weight - 1) < 1e-6, "Strength is 1.00")
+assert(W8.rows.agi.weight > 0 and W8.rows.ap.weight > 0 and W8.rows.wdps.weight > 0, "melee stats count")
+assert(W8.rows.sp.weight > 0, "spell power counts (shocks, shield, totem)")
+assert(W8.rows.sta.weight == 0.25, "stamina estimate")
+local intNoTalents = W8.rows.int.weight
+ns.SimMath.SetTalentPoints("MQ", 2)
+ns.Tabs.simlab.Update(sim)
+print("Int weight: MD 3 + MQ 0 =", intNoTalents, " MD 3 + MQ 2 =", ns.Tabs.simlab.lastWeights.rows.int.weight)
+assert(ns.Tabs.simlab.lastWeights.rows.int.weight > intNoTalents, "Mental Quickness makes Intellect worth more")
+print("PAWN:", ns.Rotation.PawnString(ns.Tabs.simlab.lastWeights))
+print("PLAIN:", ns.Rotation.PlainList(ns.Tabs.simlab.lastWeights))
+for _, r in ipairs(sim.list.rows) do if r._shown and r.data.name == "Pawn scale" then r._scripts.OnClick(r) end end
+assert(sim.copyBox and sim.copyBox.edit._text:find("^%( Pawn: v1:"), "copy box has the Pawn string")
+-- Detail section opens
+for _, r in ipairs(sim.list.rows) do if r._shown and r.data.header and r.data.header:find("^Detail") then r._scripts.OnClick(r) end end
+dumpSim("weights view, detail open")
+-- Talents: turn off, then back to real
+ns.SimMath.SetTalentOn("MD", false)
+assert(ns.SimMath.Talent("MD").points == 0 and ns.SimMath.Talent("MD").set == 3)
+ns.SimMath.SetTalentOn("MD", true)
+assert(ns.SimMath.Talent("MD").points == 3)
+ns.SimMath.ResetTalents()
+assert(ns.SimMath.Talent("MD").points == 0, "no real talents in the fake game")
+-- Caster and healer styles
+ns.db().simStyle = "ele"; ns.Tabs.simlab.SetView("total"); dumpSim("caster total")
+ns.Tabs.simlab.SetView("weights"); dumpSim("caster weights")
+assert(math.abs(ns.Tabs.simlab.lastWeights.rows.sp.weight - 1) < 1e-6, "caster: Spell Power is 1.00")
+ns.db().simStyle = "resto"; ns.Tabs.simlab.Update(sim); dumpSim("healer weights")
+assert(math.abs(ns.Tabs.simlab.lastWeights.rows.heal.weight - 1) < 1e-6, "healer: Healing is 1.00")
+-- The Healing slider changes heals now (it didn't before v0.10)
+ns.Tabs.simlab.SetView("spells")
+sim.sliders.heal:Set(50, true)
+dumpSim("healing +50")
+for _, r in ipairs(sim.list.rows) do
+  if r._shown and r.data.name == "Healing Wave" then assert(r.cols[3]._text:find("^%+"), "Healing slider raises Healing Wave") end
+end
+sim.clear._scripts.OnClick()
+ns.db().simStyle = "enh"
 -- Window closed: shift-clicks are ignored
 TheEarthenShrinkFrame:Hide()
 for _, fn in ipairs(HOOKS.ChatEdit_InsertLink) do fn("|Hitem:3|h[Thinking Cap]|h") end
@@ -528,27 +579,35 @@ dumpSim("stat weights")
 print("flametongue + stat weight tests passed")
 
 -- Mental Quickness -----------------------------------------------------------
-ns.db().simMentalQuick = nil
-assert(ns.SimMath.MentalQuickRank() == 0, "no talent API in the fake game -> 0")
+ns.SimMath.ResetTalents()
+assert(ns.SimMath.Talent("MQ").points == 0, "no talent API in the fake game -> 0")
 GetNumTalentTabs = function() return 1 end
-GetNumTalents = function() return 1 end
-GetTalentInfo = function() return "Mental Quickness", 0, 1, 1, 1, 5 end
-local r, from = ns.SimMath.MentalQuickRank()
-print("mental quickness from talents:", r, from)
-assert(r == 1 and from == "talents")
+GetNumTalents = function() return 2 end
+GetTalentInfo = function(tab, i)
+  if i == 1 then return "Mental Quickness", 0, 1, 1, 1, 5 end
+  return "Mental Dexterity", 0, 1, 1, 2, 3
+end
+local mq = ns.SimMath.Talent("MQ")
+print("mental quickness from talents:", mq.real, mq.max, mq.points)
+assert(mq.real == 1 and mq.max == 5 and mq.points == 1 and not mq.changed)
+assert(ns.SimMath.Talent("MD").points == 2, "Mental Dexterity 2/3 read from talents")
 local p0 = ns.Profile.Player()
 local q0 = ns.SimMath.Apply(p0, { int = 100 }, { mentalQuick = 1 })
 print("+100 Int with 1 point: SP", p0.sp.Nature, "->", q0.sp.Nature, "healing", p0.healing, "->", q0.healing)
 assert(math.abs(q0.sp.Nature - p0.sp.Nature - 15) < 1e-9 and math.abs(q0.healing - p0.healing - 15) < 1e-9)
-sim.mentalQuick._scripts.OnClick(sim.mentalQuick, "LeftButton")
-assert(ns.db().simMentalQuick == 2)
-sim.mentalQuick._scripts.OnClick(sim.mentalQuick, "RightButton")
-assert(ns.db().simMentalQuick == nil)
-ns.db().simMentalDex = true
+-- Mental Dexterity: 150% split over 3 points (rule) -> 2 points = 1.0 AP per Int
+local q1 = ns.SimMath.Apply(p0, { int = 10 }, { mentalDex = 2 })
+assert(math.abs(q1.ap - p0.ap - 10) < 1e-9, "2 points of MD: 10 Int = 10 AP")
+-- Test another build with the slider, then go back to real
 ns.UI.Update()
-print("button:", sim.mentalQuick._text)
-dumpSim("Mental Quickness 1 + Mental Dexterity")
-for _, row in ipairs(sim.list.rows) do if row._shown and row.data.name == "1 Intellect (compare)" then tlines = {}; row.data.tooltip(GameTooltip); for _, l in ipairs(tlines) do print("     tt: " .. l) end end end
+sim.talents.MQ:Set(2, true)  -- (the fake slider has no memory, so set it directly)
+assert(ns.SimMath.Talent("MQ").points == 2 and ns.SimMath.Talent("MQ").changed)
+assert(sim.talents.MQ.value._text:find("2/5"), "shows 2/5")
+sim.talents.MD.check:SetChecked(false); sim.talents.MD.check._scripts.OnClick(sim.talents.MD.check)
+assert(ns.SimMath.Talent("MD").points == 0)
+sim.talentReset._scripts.OnClick()
+assert(ns.SimMath.Talent("MQ").points == 1 and ns.SimMath.Talent("MD").points == 2, "Real = back to your talents")
+dumpSim("talents read from the game")
 print("mental quickness tests passed")
 
 -- Tooltip method (Forever tooltips go up with spell power) ----------------------

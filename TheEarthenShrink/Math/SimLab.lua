@@ -20,33 +20,118 @@ S.RULES = {
     -- Mental Dexterity (Enhancement talent): attack power from Intellect.
     -- A hotfix was announced to lower it to 100%, but on 2026-11-12 Angel
     -- said it hasn't happened, so 150% (unverified). If the addon can read
-    -- the talent's text, that number wins. Only used when ticked.
+    -- the talent's text, that number wins.
+    -- 🔶 We assume the 150% is what you get with ALL points in it, and each
+    -- point gives an equal share (3 points: 50% each). Not checked yet.
     mentalDexApPerInt = 1.5,
     -- Mental Quickness (Enhancement talent): spell damage and healing equal
     -- to 15% of your Intellect for each point. Angel-reported (in game,
     -- 2026-11-12: 87 Int gave 13 spell power with 1 point). The exact
     -- tooltip text isn't checked yet.
     mentalQuickSpPerIntPerRank = 0.15,
-    mentalQuickMaxRank = 5,   -- guess; only limits the button
 }
 
--- Attack power per Intellect from Mental Dexterity: from the talent's own
--- text if we can read it, otherwise the rule above. Returns ratio, source.
-function S.MentalDexRatio()
-    local text = ns.Talents and ns.Talents.Description("Mental Dexterity")
-    local pct = text and text:lower():match("(%d+)%% of your intellect")
-    if pct then return tonumber(pct) / 100, "talent" end
-    return S.RULES.mentalDexApPerInt, "rule"
+---------------------------------------------------------------------------
+-- Talents the Sim Lab knows about
+---------------------------------------------------------------------------
+-- By default the points come from your character (read from the game).
+-- You can turn a talent off ("I don't have it") or set other points to
+-- test a different build. "Reset" goes back to your real talents.
+--   db.simTalents[key] = { points = n or nil, off = true or nil }
+-- maxFallback = the max points we use only if the game doesn't tell us.
+S.TALENTS = {
+    { key = "MD", name = "Mental Dexterity", what = "Intellect gives attack power",
+      maxFallback = 3 },   -- Angel, in game 2026-11-12: "3 ranks"
+    { key = "MQ", name = "Mental Quickness", what = "Intellect gives spell power",
+      maxFallback = 3 },   -- 🔶 guess; the game's number wins when the addon can read it
+}
+S.TALENT_BY_KEY = {}
+for _, t in ipairs(S.TALENTS) do S.TALENT_BY_KEY[t.key] = t end
+
+local function talentDb(key)
+    local db = ns.db()
+    db.simTalents = db.simTalents or {}
+    db.simTalents[key] = db.simTalents[key] or {}
+    return db.simTalents[key]
 end
 
--- Points in Mental Quickness: your setting, or your talents, or 0.
--- Returns rank, where it came from ("talents", "setting" or "none").
-function S.MentalQuickRank()
-    local set = ns.db().simMentalQuick
-    if type(set) == "number" then return set, "setting" end
-    local r = ns.Talents and ns.Talents.Rank("Mental Quickness")
-    if r then return r, "talents" end
-    return 0, "none"
+-- Everything about one talent for the Sim Lab:
+--   real   = your points, read from the game (nil if the addon can't tell)
+--   max    = most points it can have (from the game, else maxFallback)
+--   points = the points the Sim Lab uses now (0 when turned off)
+--   set    = the points you picked (or real), even while turned off
+--   on     = the "I have it" tick
+--   changed = true if you changed anything from your real talents
+function S.Talent(key)
+    local t = S.TALENT_BY_KEY[key]
+    local real, max = nil, nil
+    if ns.Talents then real, max = ns.Talents.Rank(t.name) end
+    local maxFromGame = max ~= nil and max > 0
+    max = maxFromGame and max or t.maxFallback
+    local d = talentDb(key)
+    -- Settings from v0.9 (a tick box and a number) carry over once, but
+    -- only if the game doesn't tell us your real talents.
+    local db = ns.db()
+    if real == nil and not d.migrated then
+        d.migrated = true
+        if key == "MD" and db.simMentalDex then d.points = max end
+        if key == "MQ" and type(db.simMentalQuick) == "number" then d.points = db.simMentalQuick end
+    end
+    local set = d.points or real or 0
+    set = math.max(0, math.min(max, set))
+    local on = not d.off and set > 0
+    return {
+        key = key, name = t.name, what = t.what, real = real, max = max, maxFromGame = maxFromGame,
+        set = set, on = on, points = on and set or 0,
+        changed = (d.points ~= nil and d.points ~= real) or (d.off ~= nil and set > 0),
+    }
+end
+
+-- Tick "I have it" on or off.
+function S.SetTalentOn(key, on)
+    local d = talentDb(key)
+    local info = S.Talent(key)
+    if on then
+        d.off = nil
+        if info.set == 0 then d.points = 1 end     -- ticking it with 0 points means at least 1
+    else
+        d.off = true
+    end
+end
+
+-- Pick the points (the slider). 0 points also clears the tick.
+function S.SetTalentPoints(key, n)
+    local d = talentDb(key)
+    d.points = math.floor(n + 0.5)
+    d.off = nil
+end
+
+-- Back to the talents your character really has.
+function S.ResetTalents()
+    local db = ns.db()
+    db.simTalents = db.simTalents or {}
+    for _, t in ipairs(S.TALENTS) do db.simTalents[t.key] = { migrated = true } end
+end
+
+-- Attack power per Intellect from ONE point of Mental Dexterity. From the
+-- talent's own text if we can read it, otherwise the rule above.
+-- Returns ratio per point, source.
+function S.MentalDexRatio()
+    local info = S.Talent("MD")
+    local text = ns.Talents and ns.Talents.Description("Mental Dexterity")
+    local pct = text and text:lower():match("(%d+)%% of your intellect")
+    if pct then
+        -- 🔶 The text shows your CURRENT points if you have any, so divide by
+        -- them; with none we guess it shows the full talent.
+        local per = (info.real and info.real > 0) and info.real or info.max
+        return tonumber(pct) / 100 / per, "talent"
+    end
+    return S.RULES.mentalDexApPerInt / info.max, "rule"
+end
+
+-- Points in each talent that the Sim Lab uses right now.
+function S.TalentOpts()
+    return { mentalDex = S.Talent("MD").points, mentalQuick = S.Talent("MQ").points }
 end
 
 -- The stats you can add. Order = order of the sliders.
@@ -91,19 +176,21 @@ function S.Apply(p, add, opts)
     end
 
     local apFromStr = (add.str or 0) * R.apPerStr
-    local mdRatio = S.MentalDexRatio()
-    local apFromInt = opts.mentalDex and (add.int or 0) * mdRatio or 0
+    local md = tonumber(opts.mentalDex) or 0
+    local mdRatio = S.MentalDexRatio() * md
+    local apFromInt = (add.int or 0) * mdRatio
     q.ap = (p.ap or 0) + apFromStr + apFromInt + (add.ap or 0)
     if apFromStr ~= 0 then note(("%s Strength × %s = %s attack power"):format(f(add.str), f(R.apPerStr), f(apFromStr))) end
-    if apFromInt ~= 0 then note(("%s Intellect × %s (Mental Dexterity) = %s attack power"):format(f(add.int), f(mdRatio, 2), f(apFromInt))) end
+    if apFromInt ~= 0 then note(("%s Intellect × %s (Mental Dexterity, %d points) = %s attack power"):format(f(add.int), f(mdRatio, 2), md, f(apFromInt))) end
 
     local critFromAgi = (add.agi or 0) / R.agiPerMeleeCrit
-    q.meleeCrit = math.max(0, (p.meleeCrit or 0) + critFromAgi + (add.crit or 0))
+    -- add.mcrit / add.scrit = melee-only / spell-only crit (used by the stat weights)
+    q.meleeCrit = math.max(0, (p.meleeCrit or 0) + critFromAgi + (add.crit or 0) + (add.mcrit or 0))
     if critFromAgi ~= 0 then note(("%s Agility ÷ %s = %s%% melee crit"):format(f(add.agi), f(R.agiPerMeleeCrit), f(critFromAgi, 2))) end
 
     local intPerCrit = R.intPerSpellCrit(L)
     local critFromInt = (add.int or 0) / intPerCrit
-    q.spellCrit = math.max(0, (p.spellCrit or 0) + critFromInt + (add.crit or 0))
+    q.spellCrit = math.max(0, (p.spellCrit or 0) + critFromInt + (add.crit or 0) + (add.scrit or 0))
     if critFromInt ~= 0 then note(("%s Intellect ÷ %s = %s%% spell crit"):format(f(add.int), f(intPerCrit, 1), f(critFromInt, 2))) end
 
     local manaFromInt = (add.int or 0) * R.manaPerInt
@@ -114,6 +201,13 @@ function S.Apply(p, add, opts)
     q.spellHit = (p.spellHit or 0) + (add.hit or 0)
     q.healing = (p.healing or 0) + (add.heal or 0) + spFromInt
     if opts.weapon and opts.weapon.min then q.weapon = opts.weapon end
+    -- Weapon DPS (used by the stat weights): +1 DPS = + speed damage per hit.
+    if (add.wdps or 0) ~= 0 and q.weapon and q.weapon.speed then
+        local w = {}
+        for k, v in pairs(q.weapon) do w[k] = v end
+        w.min, w.max = w.min + add.wdps * w.speed, w.max + add.wdps * w.speed
+        q.weapon = w
+    end
     return q, why
 end
 
@@ -162,7 +256,7 @@ end
 
 -- Item stat keys that map onto a slider. Spell power lines in this era say
 -- "damage and healing", so they move both the Spell Power and Healing sliders.
-local ITEM_TO_SLIDER = { str = { "str" }, agi = { "agi" }, int = { "int" }, sp = { "sp", "heal" },
+local ITEM_TO_SLIDER = { str = { "str" }, agi = { "agi" }, int = { "int" }, sp = { "sp", "heal" }, heal = { "heal" },
                          ap = { "ap" }, crit = { "crit" }, hit = { "hit" } }
 
 -- new = stats of the item you're trying, old = the item it would replace.
