@@ -133,7 +133,7 @@ function T.Wasted()
     else
         bestKey = "WFT"
         why = now == "WF" and "it stacks with your Windfury Weapon, and frees your Fire spot for Searing or Magma Totem"
-            or "it frees your Fire spot for Searing or Magma Totem. See Best setup on the Weapon Buffs tab"
+            or "it frees your Fire spot for Searing or Magma Totem"
     end
     return {
         activeKey = activeKey, active = NAME[activeKey], drop = NAME[wastedKey],
