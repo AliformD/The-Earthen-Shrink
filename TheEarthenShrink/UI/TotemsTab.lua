@@ -173,7 +173,9 @@ function T.UpdateLive(page)
     for _, b in ipairs(page.bars) do updateBar(b) end
     local wasted = TR().wastedNow
     if wasted then
-        page.logLine:SetText(("|cffff4a3aOnly one of Windfury / Flametongue Totem works. Keep %s, swap %s.|r"):format(wasted.keep, wasted.drop))
+        page.logLine:SetText(wasted.bestIsActive
+            and ("|cffff4a3aActive: %s (dropped last). %s is wasted: swap it.|r"):format(wasted.active, wasted.drop)
+            or ("|cffff4a3aActive: %s (dropped last). %s is wasted. Better: drop %s again.|r"):format(wasted.active, wasted.drop, wasted.best))
         return
     end
     local line = TR().ShortLine("MST")

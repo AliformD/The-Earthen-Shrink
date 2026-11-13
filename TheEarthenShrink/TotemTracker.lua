@@ -100,40 +100,64 @@ T.REASONS = {
 ---------------------------------------------------------------------------
 -- Since the shaman patch (Angel, in game 2026-11-13) a player only gets ONE
 -- of Windfury Totem or Flametongue Totem, even with both on the ground. The
--- game still lets you drop both, so one of them is wasted mana (for you
--- and for your party). We warn once each time it happens.
+-- game still lets you drop both, but the totem you drop LAST overwrites the
+-- other one's buff (Angel, in game 2026-11-13). Both stay on the floor, so
+-- the older one is wasted mana (for you and for your party). We warn once
+-- each time this happens, and again if you re-drop and the active one
+-- changes.
 -- 🔶 We only see YOUR totems, not another Shaman's in your group.
 
-local wastedShown = false
+local wastedShownFor = nil   -- key of the active totem we last warned about
 
--- Returns nil, or { keep = "Windfury Totem", drop = "Flametongue Totem", why = "..." }.
+local NAME = { WFT = "Windfury Totem", FTT = "Flametongue Totem" }
+
+-- Returns nil, or:
+--   { active = "Windfury Totem" (dropped last: its buff is the one you have),
+--     drop = "Flametongue Totem" (the wasted one), activeKey = "WFT",
+--     best = the one we'd keep, bestIsActive = true/false, why = "..." }
 function T.Wasted()
     local air, fire = active.Air, active.Fire
     if not (air and fire and air.key == "WFT" and fire.key == "FTT") then return nil end
-    -- Which one to keep: the one that matches your weapon buff stacks with it.
+    -- Last one dropped wins (the newer start time).
+    local activeKey = (fire.start or 0) > (air.start or 0) and "FTT" or "WFT"
+    local wastedKey = activeKey == "FTT" and "WFT" or "FTT"
+    -- Which one we'd keep: the one that matches your weapon buff stacks with it.
     local now
     if ns.Profile and ns.Profile.Player then
         local ok, p = pcall(ns.Profile.Player)
         now = ok and p and p.imbueNow
     end
+    local bestKey, why
     if now == "FT" then
-        return { keep = "Flametongue Totem", drop = "Windfury Totem", why = "it stacks with your Flametongue Weapon" }
-    end
-    return { keep = "Windfury Totem", drop = "Flametongue Totem",
+        bestKey, why = "FTT", "it stacks with your Flametongue Weapon"
+    else
+        bestKey = "WFT"
         why = now == "WF" and "it stacks with your Windfury Weapon, and frees your Fire spot for Searing or Magma Totem"
-            or "it frees your Fire spot for Searing or Magma Totem. See Best setup on the Weapon Buffs tab" }
+            or "it frees your Fire spot for Searing or Magma Totem. See Best setup on the Weapon Buffs tab"
+    end
+    return {
+        activeKey = activeKey, active = NAME[activeKey], drop = NAME[wastedKey],
+        best = NAME[bestKey], bestIsActive = bestKey == activeKey, why = why,
+        -- kept for older code: the one to keep
+        keep = NAME[bestKey],
+    }
 end
 
 local function checkWasted()
     local w = T.Wasted()
     T.wastedNow = w      -- the Totems tab reads this (cheap) every frame
-    if not w then wastedShown = false return end
-    if wastedShown or ns.db().wastedWarn == false then return end
-    wastedShown = true
-    local msg = ("Windfury Totem and Flametongue Totem are both down, but players only get one of them. Keep %s, because %s. Swap %s for another totem."):format(w.keep, w.why, w.drop)
+    if not w then wastedShownFor = nil return end
+    if wastedShownFor == w.activeKey or ns.db().wastedWarn == false then return end
+    wastedShownFor = w.activeKey
+    local msg = ("Windfury Totem and Flametongue Totem are both down, but you only get one buff: the totem dropped last wins. Active now: %s. Wasted: %s."):format(w.active, w.drop)
+    if w.bestIsActive then
+        msg = msg .. (" Good choice (%s). Swap %s for another totem."):format(w.why, w.drop)
+    else
+        msg = msg .. (" Better: %s, because %s. Drop %s again to get its buff back, then swap %s for another totem."):format(w.best, w.why, w.best, w.drop)
+    end
     ns.say("|cffff4a3a" .. msg .. "|r")
     if UIErrorsFrame and UIErrorsFrame.AddMessage then
-        pcall(UIErrorsFrame.AddMessage, UIErrorsFrame, "Wasted totem: only one of Windfury / Flametongue Totem works", 1, 0.3, 0.2)
+        pcall(UIErrorsFrame.AddMessage, UIErrorsFrame, ("Wasted totem: %s is overwritten by %s"):format(w.drop, w.active), 1, 0.3, 0.2)
     end
 end
 T.CheckWasted = checkWasted
@@ -141,7 +165,7 @@ T.CheckWasted = checkWasted
 function T.WastedSlash(arg)
     local db = ns.db()
     if arg == "on" then db.wastedWarn = true elseif arg == "off" then db.wastedWarn = false else db.wastedWarn = db.wastedWarn == false end
-    wastedShown = false
+    wastedShownFor = nil
     ns.say("wasted totem warning: " .. (db.wastedWarn ~= false and "|cff1eff00on|r" or "|cffff4a3aoff|r") .. ". Change with /es wastedwarn on|off.")
     checkWasted()
 end

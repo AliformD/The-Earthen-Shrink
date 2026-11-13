@@ -151,8 +151,11 @@ end
 --   * But a player only gets ONE of Windfury Totem or Flametongue Totem,
 --     even with both on the ground. The game lets you drop both; one is
 --     simply wasted, for you and for your party.
--- 🔶 Which one the game keeps when both are down is NOT tested yet. Here we
--- count the better one for this weapon buff, and say which.
+--   * When both are down, the one dropped LAST overwrites the other's buff
+--     (Angel, in game 2026-11-13). If the totem timer sees both of YOUR
+--     totems down, we count the one you dropped last. Otherwise (the
+--     settings only say "both in the group") we count the better one,
+--     because you'd drop that one last.
 
 -- Adds one totem plan to a copy of the buff. use = "WFT" or "FTT".
 -- Returns the new buff and the explanation line (or nil if it can't add).
@@ -185,6 +188,9 @@ function M.WithTotems(p, ctx, key, buff, L)
     if ctx.totem then options[#options + 1] = "WFT" end
     if ctx.ftTotem then options[#options + 1] = "FTT" end
     if #options == 0 then return M.Swing(p, ctx, buff), nil end
+    -- Both down for real: the last one dropped is the only one that counts.
+    local live = ctx.bothTotems and ns.TotemTracker and ns.TotemTracker.wastedNow
+    if live then options = { live.activeKey } end
     local best, bestUse, bestLine
     for _, use in ipairs(options) do
         local b, line = addTotem(ctx, key, buff, use)
@@ -194,8 +200,10 @@ function M.WithTotems(p, ctx, key, buff, L)
     if L then
         if bestLine then L[#L + 1] = bestLine end
         if ctx.bothTotems then
-            L[#L + 1] = ("|cffff4a3aBoth Windfury and Flametongue Totem are on: you only get one.|r Counted: %s (the better one here; which one the game keeps is untested)."):format(
-                bestUse == "WFT" and "Windfury Totem" or "Flametongue Totem")
+            local name = bestUse == "WFT" and "Windfury Totem" or "Flametongue Totem"
+            L[#L + 1] = live
+                and ("|cffff4a3aBoth Windfury and Flametongue Totem are on: you only get one.|r Counted: %s (you dropped it last, so its buff overwrote the other)."):format(name)
+                or ("|cffff4a3aBoth Windfury and Flametongue Totem are on: you only get one.|r Counted: %s (the better one here; the totem dropped last wins, so drop this one last)."):format(name)
         end
     end
     return best, bestUse

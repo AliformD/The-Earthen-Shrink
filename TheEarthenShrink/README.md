@@ -65,9 +65,9 @@ The shaman changes are live (Angel saw them in game on 2026-11-13). What changed
 - **Mental Dexterity:** 100% of Intellect as attack power at max rank (33 / 66 / 100%). The talent text still wins.
 - **Mental Quickness:** 30% of Intellect as spell power at max rank, split evenly over the ranks the game says it has. The talent text still wins.
 - **Windfury Totem:** the totem gives fewer extra attacks than the weapon (one instead of two). The number is read from the totem's tooltip; if the text has no number, the totem counts as 1 and the weapon as 2.
-- **Totem rules:** the totem that matches your weapon buff stacks with it, but a player only gets **one** of Windfury Totem or Flametongue Totem. If both settings are on, the math counts only the better one and says so.
+- **Totem rules:** the totem that matches your weapon buff stacks with it, but a player only gets **one** of Windfury Totem or Flametongue Totem: the one dropped **last** overwrites the other's buff (both stay on the floor). If the addon sees both of your totems down, the math counts the last one; if only the settings say both, it counts the better one.
 - **Best setup** (Weapon Buffs tab, or `/es setup`): every weapon buff × every totem plan (Windfury Totem + Searing, Windfury Totem + Magma, Flametongue Totem, Searing alone, Magma alone), run through the Sim Lab's whole damage mix. Left number = your DPS, right number = plus what the totem gives the other melee in your party. Click the setting rows to change how many enemies (Magma only shows at 2+) and how many other melee are in your party.
-- **Wasted totem warning:** if your Windfury Totem and Flametongue Totem are down at the same time, you get a red chat message, a red line on the Totems tab, and the wasted bar turns red. It says which one to keep (the one matching your weapon buff). `/es wastedwarn off` turns it off.
+- **Wasted totem warning:** if your Windfury Totem and Flametongue Totem are down at the same time, you get a red chat message, a red line on the Totems tab, and the wasted bar turns red. It says which one is active (the one you dropped last), which one is wasted, and whether you should drop the other one again (the one matching your weapon buff is the one to keep). `/es wastedwarn off` turns it off.
 
 Not in the math: **Maelstrom Weapon** (its proc chance went down in the patch; the addon doesn't use it yet).
 
@@ -115,7 +115,7 @@ Not in the math: **Maelstrom Weapon** (its proc chance went down in the patch; t
 - Tooltips already include your spell power (Angel saw this in Forever), so the math takes that part out before adding spell power back. `/es sptooltip off` turns this off.
 - Stormstrike does 100% weapon damage every 8 sec if its tooltip doesn't say (Angel, in game after the patch, 2026-11-13)
 - Mental Dexterity gives 100% of Intellect as attack power at max rank, Mental Quickness 30% as spell power, if the talent text can't be read (Angel, same day)
-- When both Windfury Totem and Flametongue Totem are down, which one the game keeps for you is untested; the math counts the better one
+- When both Windfury Totem and Flametongue Totem are down, the one dropped last overwrites the other's buff (Angel, in game 2026-11-13). If the addon sees both of your totems down it counts the last one; from the settings alone it counts the better one (you'd drop that one last)
 - How much spell power each spell gets (cast time ÷ 3.5), and the penalty for ranks learned before level 20. **You can replace this with your own measured number on the SP Test tab.**
 - Damage over time ticks every 3 sec (so Flame Shock has 4 ticks). You can change the number of ticks on the SP Test tab
 - 96% base spell hit, 5% melee miss, 5% dodge

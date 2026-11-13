@@ -263,7 +263,8 @@ function T.Update(page)
         rows[#rows + 1] = { header = ("Rockbiter is on now: took its %d AP out of your stats for the test"):format(ctx.removedRB) }
     end
     if ctx and ctx.bothTotems then
-        rows[#rows + 1] = { header = "|cffff4a3aWindfury Totem and Flametongue Totem are both on: a player only gets one. Each buff counts the better one.|r" }
+        rows[#rows + 1] = { header = (ns.TotemTracker and ns.TotemTracker.wastedNow) and ("|cffff4a3aWindfury and Flametongue Totem are both down: only %s counts (dropped last).|r"):format(ns.TotemTracker.wastedNow.active)
+            or "|cffff4a3aWindfury Totem and Flametongue Totem are both on: a player only gets one (the one dropped last). Each buff counts the better one.|r" }
     end
     if ns.Setup then
         for _, r in ipairs(ns.Setup.Rows(p)) do rows[#rows + 1] = r end
