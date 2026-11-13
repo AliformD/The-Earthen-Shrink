@@ -97,11 +97,17 @@ function SD.ParseImbue(key, text)
         out.sp = tonumber(lower:match("spell damage by " .. NUM) or lower:match("spell power by " .. NUM))
         -- Frostbrand usually doesn't say its chance. nil = use the setting.
         out.chance = tonumber(lower:match(NUM .. "%% chance"))
-    elseif key == "WF" then
+    elseif key == "WF" or key == "WFT" then
         out.chance = tonumber(lower:match(NUM .. "%% chance"))
         out.ap = findAP(lower)
-        local n = lower:match(NUM .. " extra attack") or lower:match("(%a+) extra attack")
-        out.attacks = tonumber(n) or WORDS[n or ""] or 2
+        -- "attack power" is hidden first, so "122 extra attack power" isn't
+        -- read as 122 extra attacks.
+        local t = lower:gsub("attack power", "ap")
+        local n = t:match(NUM .. " extra attack") or t:match("(%a+) extra attack")
+            or t:match(NUM .. " additional attack") or t:match("(%a+) additional attack")
+        -- If the text doesn't say how many: the weapon gives two, and since
+        -- the shaman patch (Angel, in game 2026-11-13) the totem gives one.
+        out.attacks = tonumber(n) or WORDS[n or ""] or (key == "WFT" and 1 or 2)
         out.attacksGuessed = not (tonumber(n) or WORDS[n or ""])
         if not out.chance or not out.ap then return nil end
     end
@@ -293,7 +299,7 @@ local function readRank(spell, id, rank, guessLevel)
     elseif k == "totem" then
         rec.totem = SD.ParseTotem(spell.totem, rec.desc)
         rec.parsed = rec.totem ~= nil
-        if spell.key == "WFT" then rec.imbue = SD.ParseImbue("WF", rec.desc) end
+        if spell.key == "WFT" then rec.imbue = SD.ParseImbue("WFT", rec.desc) end
         -- Flametongue Totem gives fire damage on hits, like the weapon buff.
         if spell.key == "FTT" then rec.imbue = SD.ParseImbue("FT", rec.desc) end
     elseif k == "shield" then

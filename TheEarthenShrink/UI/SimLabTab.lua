@@ -208,10 +208,11 @@ function T.TalentTooltip(tt, key)
     elseif key == "MD" then
         local per, src = S.MentalDexRatio()
         tt:AddLine(("Each point: 1 Intellect = %s attack power (%s)."):format(ns.fmt(per, 2),
-            src == "talent" and "read from the talent's text" or "50% per point, as Angel saw in game"), 0.91, 0.89, 0.78, true)
+            src == "talent" and "read from the talent's text" or "100% at max rank, as Angel saw in game after the patch"), 0.91, 0.89, 0.78, true)
     else
-        tt:AddLine(("Each point: spell damage and healing = %s%% of your Intellect (what Angel saw in game, tooltip not checked yet)."):format(
-            ns.fmt(S.RULES.mentalQuickSpPerIntPerRank * 100)), 0.91, 0.89, 0.78, true)
+        local per, src = S.MentalQuickRatio()
+        tt:AddLine(("Each point: spell damage and healing = %s%% of your Intellect (%s)."):format(
+            ns.fmt(per * 100, 1), src == "talent" and "read from the talent's text" or "30% at max rank, as Angel saw in game after the patch"), 0.91, 0.89, 0.78, true)
     end
     if not info.maxFromGame then
         tt:AddLine(("🔶 Max %d points is a guess; the game's number is used when the addon can read it."):format(info.max), 0.6, 0.6, 0.6, true)

@@ -18,7 +18,7 @@ ns.GameCheck = G
 -- probably change with your gear; they're left out.)
 G.WATCH = { "SS", "WF", "WFT", "RB" }
 -- Talents whose text we watch (only if the game lets us read it).
-G.TALENTS = { "Mental Dexterity", "Mental Quickness", "Elemental Weapons", "Spirit Weapons" }
+G.TALENTS = { "Mental Dexterity", "Mental Quickness", "Elemental Weapons", "Spirit Weapons", "Maelstrom Weapon" }
 G.TALENT_POINTS = "Your points in talents that change tooltips"
 
 local function build()

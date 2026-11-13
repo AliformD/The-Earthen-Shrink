@@ -31,9 +31,9 @@ R.RULES = {
     -- Earth / Frost / Flame Shock share one 6 sec cooldown (Angel, in game
     -- 2026-11-12): one shock OR the other every 6 sec, never both.
     shockCooldown = 6,
-    -- Stormstrike cooldown if its tooltip doesn't say. Angel saw 6 sec in
-    -- game on 2026-11-12 (the hotfix to 8 sec hadn't happened yet).
-    strikeCooldown = 6,
+    -- Stormstrike cooldown if its tooltip doesn't say. The shaman patch is
+    -- live (Angel, in game 2026-11-13): 8 sec.
+    strikeCooldown = 8,
     -- Lightning Shield (Angel, in game 2026-11-12): one cast puts up 3 balls
     -- (charges). Each time something hits you, one ball strikes it and goes
     -- away (at most one every few seconds). When all 3 are gone you recast
@@ -130,8 +130,9 @@ local function meleeParts(q, opts, out)
         dps = swingDps, mana = 0, every = q.weapon.speed,
         lines = {
             ("One swing every %s sec, %s%% land, crits counted"):format(f(q.weapon.speed, 2), f(ctx.land * 100)),
-            ctx.totem and "Includes Windfury Totem in your group" or "",
-            ctx.ftTotem and "Includes Flametongue Totem fire on each hit" or "",
+            ctx.bothTotems and "Windfury + Flametongue Totem both on: only one counts" or
+                (ctx.totem and "Includes Windfury Totem in your group" or ""),
+            (ctx.ftTotem and not ctx.bothTotems) and "Includes Flametongue Totem fire on each hit" or "",
             fl and ("Flurry %d: +%s%% speed, on %s%% of the time = %s× swings%s"):format(fl.points, f(fl.pct),
                 f(fl.uptime * 100), f(flurry, 3), fl.fromText and "" or " 🔶") or "",
             { "DPS", f(swingDps, 1) },
@@ -235,25 +236,34 @@ local function shieldPart(q, out)
     }
 end
 
--- Searing Totem (left out if Flametongue Totem is your fire totem: that one
--- is already in your weapon swings).
-local function totemPart(q, out)
-    if ns.db().ftTotem then return end
-    local rank = best("ST", q)
+-- Your fire totem. opts.fireTotem picks it: "ST" (Searing), "MT" (Magma,
+-- hits opts.targets enemies), "FTT" / "none" (no damage totem; Flametongue
+-- Totem is already in your weapon swings). Not given: Searing, unless the
+-- Flametongue Totem setting is on.
+local function totemPart(q, out, opts)
+    local which = opts and opts.fireTotem
+    if not which then which = ns.db().ftTotem and "none" or "ST" end
+    if which ~= "ST" and which ~= "MT" then return end
+    local rank = best(which, q)
     local t = rank and rank.totem
     if not (t and t.min and rank.mana) then return end
-    local coef, tested = testedCoef("ST", rank, "totem", ns.TotemMath and ns.TotemMath.RULES.totemCoef or 0.08)
-    local interval = t.interval or (ns.TotemMath and ns.TotemMath.RULES.searingInterval) or 2.5
+    local TM = ns.TotemMath and ns.TotemMath.RULES or {}
+    local coef, tested = testedCoef(which, rank, "totem", TM.totemCoef or 0.08)
+    local interval = t.interval or (which == "MT" and TM.magmaInterval or TM.searingInterval) or 2.5
     local per = withSpellPower((t.min + t.max) / 2, rank, coef, q.sp and q.sp.Fire) * spellCritMult(q) * spellHitChance(q)
+    local targets = which == "MT" and math.max(1, (opts and opts.targets) or 1) or 1
     local dur = t.duration or R.RULES.totemDuration
+    local name = which == "MT" and "Magma Totem" or "Searing Totem"
     out[#out + 1] = {
-        key = "ST", name = "Searing Totem", kind = "spell", icon = rank.icon,
-        dps = per / interval, mana = rank.mana / dur, usesMana = true, every = interval,
-        sub = ("attacks every %s sec"):format(f(interval, 1)),
+        key = which, name = name, kind = "spell", icon = rank.icon,
+        dps = per * targets / interval, mana = rank.mana / dur, usesMana = true, every = interval,
+        sub = ("%s every %s sec%s"):format(which == "MT" and "pulses" or "attacks", f(interval, 1),
+            targets > 1 and (" · " .. targets .. " enemies") or ""),
         lines = {
-            ("%s per attack (spell power share %s%s)"):format(f(per, 1), f(coef, 2), tested and ", your test" or " 🔶"),
+            ("%s per %s (spell power share %s%s)"):format(f(per, 1), which == "MT" and "enemy per pulse" or "attack", f(coef, 2), tested and ", your test" or " 🔶"),
+            targets > 1 and ("× %d enemies in range"):format(targets) or "",
             ("Recast every %s sec for %s mana"):format(f(dur), f(rank.mana)),
-            { "DPS", f(per / interval, 1) },
+            { "DPS", f(per * targets / interval, 1) },
         },
     }
 end
@@ -311,11 +321,11 @@ function R.Total(q, opts)
         strikePart(q, parts)
         shockParts(q, parts)
         shieldPart(q, parts)
-        totemPart(q, parts)
+        totemPart(q, parts, opts)
     elseif style.id == "ele" then
         shockParts(q, parts)
         shieldPart(q, parts)
-        totemPart(q, parts)
+        totemPart(q, parts, opts)
         boltPart(q, parts)
     else
         healPart(q, parts)
