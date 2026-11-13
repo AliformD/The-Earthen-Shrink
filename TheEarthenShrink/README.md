@@ -57,6 +57,20 @@ Everything (duration, mana per tick, how often it ticks, cost) is read from the 
 
 Not tested in game yet: if Forever hides your mana or the totem timer in combat, the addon skips that part instead of guessing. A tick that happens when you are already at full mana gives nothing, so it can't be seen. Type `/es totemtest` to see what works.
 
+## Shaman patch (v0.14.0)
+
+The shaman changes are live (Angel saw them in game on 2026-11-13). What changed in the addon:
+
+- **Stormstrike:** 100% weapon damage, 8 sec cooldown when the tooltip doesn't say (the tooltip still wins).
+- **Mental Dexterity:** 100% of Intellect as attack power at max rank (33 / 66 / 100%). The talent text still wins.
+- **Mental Quickness:** 30% of Intellect as spell power at max rank, split evenly over the ranks the game says it has. The talent text still wins.
+- **Windfury Totem:** the totem gives fewer extra attacks than the weapon (one instead of two). The number is read from the totem's tooltip; if the text has no number, the totem counts as 1 and the weapon as 2.
+- **Totem rules:** the totem that matches your weapon buff stacks with it, but a player only gets **one** of Windfury Totem or Flametongue Totem: the one dropped **last** overwrites the other's buff (both stay on the floor). If the addon sees both of your totems down, the math counts the last one; if only the settings say both, it counts the better one.
+- **Best setup** (Weapon Buffs tab, or `/es setup`): every weapon buff × every totem plan (Windfury Totem + Searing, Windfury Totem + Magma, Flametongue Totem, Searing alone, Magma alone), run through the Sim Lab's whole damage mix. Left number = your DPS, right number = plus what the totem gives the other melee in your party. Click the setting rows to change how many enemies (Magma only shows at 2+) and how many other melee are in your party.
+- **Wasted totem warning:** if your Windfury Totem and Flametongue Totem are down at the same time, you get a red chat message, a red line on the Totems tab, and the wasted bar turns red. It says which one is active (the one you dropped last), which one is wasted, and whether you should drop the other one again (the one matching your weapon buff is the one to keep). `/es wastedwarn off` turns it off.
+
+Not in the math: **Maelstrom Weapon** (its proc chance went down in the patch; the addon doesn't use it yet).
+
 ## Commands
 
 | Type | What it does |
@@ -68,7 +82,7 @@ Not tested in game yet: if Forever hides your mana or the totem timer in combat,
 | `/es test` | Open the Spell Power Test |
 | `/es changes` | Checks the game values the addon watches (Stormstrike, Windfury, Rockbiter, the Mental Dexterity / Mental Quickness / Elemental Weapons / Spirit Weapons talent text if readable, and your points in talents that change tooltips) and lists any that changed since last time. This also runs by itself a few seconds after you log in, and only prints if something changed |
 | `/es fttotem on` / `off` | Flametongue Totem is (or isn't) in your group |
-| `/es ftstack on` / `off` | Flametongue Totem does (or doesn't) stack with Flametongue Weapon (unverified) |
+| `/es ftstack on` / `off` | Flametongue Totem does (or doesn't) stack with Flametongue Weapon (yes since the patch) |
 | `/es meter` | Prints what the game's damage meter tells addons (send a screenshot so we can read hits from it later) |
 | `/es inspect` | Inspect your target and open the Inspect tab |
 | `/es minimap` | Show or hide the minimap button |
@@ -84,6 +98,10 @@ Not tested in game yet: if Forever hides your mana or the totem timer in combat,
 | `/es wfstack on` / `off` | Windfury Totem does (or doesn't) stack with Windfury Weapon |
 | `/es ftcoef 0.1` | Unverified: add 10% of your Fire spell power to each Flametongue hit |
 | `/es swings 50` | How many swings the weapon buff test uses |
+| `/es setup` | Print the best weapon buff + totem setups in chat |
+| `/es aoe 3` | Enemies in the fight for the best setup (1 = one target; 2+ also tests Magma Totem) |
+| `/es groupmelee 2` | Other melee players in your party (they get your Windfury or Flametongue Totem) |
+| `/es wastedwarn on` / `off` | Warn when Windfury Totem and Flametongue Totem are both down |
 
 ## Where the numbers come from
 
@@ -95,9 +113,9 @@ Not tested in game yet: if Forever hides your mana or the totem timer in combat,
 
 **Old Classic rules, used until we can test them in Forever** (all in `Math/Spells.lua` and `Math/Imbues.lua` under `RULES`, so they're easy to change):
 - Tooltips already include your spell power (Angel saw this in Forever), so the math takes that part out before adding spell power back. `/es sptooltip off` turns this off.
-- Stormstrike does 150% weapon damage if its tooltip doesn't say (Angel, 2026-11-12: the announced 100% hotfix isn't live yet)
-- Mental Dexterity gives 150% of Intellect as attack power if the talent text can't be read (same: the announced lower value isn't live yet)
-- Flametongue Totem stacks with Flametongue Weapon (a setting; Blizzard's notes say weapon buffs stack with totems, using Windfury as the example)
+- Stormstrike does 100% weapon damage every 8 sec if its tooltip doesn't say (Angel, in game after the patch, 2026-11-13)
+- Mental Dexterity gives 100% of Intellect as attack power at max rank, Mental Quickness 30% as spell power, if the talent text can't be read (Angel, same day)
+- When both Windfury Totem and Flametongue Totem are down, the one dropped last overwrites the other's buff (Angel, in game 2026-11-13). If the addon sees both of your totems down it counts the last one; from the settings alone it counts the better one (you'd drop that one last)
 - How much spell power each spell gets (cast time ÷ 3.5), and the penalty for ranks learned before level 20. **You can replace this with your own measured number on the SP Test tab.**
 - Damage over time ticks every 3 sec (so Flame Shock has 4 ticks). You can change the number of ticks on the SP Test tab
 - 96% base spell hit, 5% melee miss, 5% dodge

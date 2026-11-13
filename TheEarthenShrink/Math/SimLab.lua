@@ -17,15 +17,16 @@ S.RULES = {
     -- Classic rule. See Math/HitCrit.lua (H.Conversions).
     manaPerInt = 15,          -- 🔶 1 Intellect = 15 mana
     -- Mental Dexterity (Enhancement talent, 3 points): attack power from
-    -- Intellect. Angel, in game 2026-11-12: 50% / 100% / 150% of Intellect
-    -- for 1 / 2 / 3 points. A coming patch makes it 33% / 66% / 100%; the
-    -- addon spots that from the talent's text (see MentalDexRatio).
-    mentalDexApPerInt = 1.5,     -- with all 3 points
-    -- Mental Quickness (Enhancement talent): spell damage and healing equal
-    -- to 15% of your Intellect for each point. Angel-reported (in game,
-    -- 2026-11-12: 87 Int gave 13 spell power with 1 point). The exact
-    -- tooltip text isn't checked yet.
-    mentalQuickSpPerIntPerRank = 0.15,
+    -- Intellect. The shaman patch is live (Angel, in game 2026-11-13):
+    -- 33% / 66% / 100% of Intellect for 1 / 2 / 3 points. The talent's own
+    -- text wins when the addon can read it (see MentalDexRatio).
+    mentalDexApPerInt = 1.0,     -- with all points
+    -- Mental Quickness (Enhancement talent): spell damage and healing from
+    -- Intellect. Angel, in game 2026-11-13: 30% of Intellect at max rank.
+    -- We split that evenly over the ranks the game says it has (2 ranks =
+    -- 15% each, 3 ranks = 10% each). The talent's own text wins when the
+    -- addon can read it (see MentalQuickRatio).
+    mentalQuickSpPerIntMax = 0.30,
 }
 
 ---------------------------------------------------------------------------
@@ -131,8 +132,31 @@ function S.MentalDexRatio()
         if pct == 50 or pct == 150 then return 0.5, "talent" end
         if pct == 100 and info.real == 2 then return 0.5, "talent" end
         if pct == 100 and info.real == 3 then return 1 / 3, "talent" end
+        -- Any other number: the text shows one rank. If it's a whole
+        -- step of the rule (like 33 of 100), use it per point.
+        local k = info.max and info.max > 0 and math.floor(pct / (S.RULES.mentalDexApPerInt * 100 / info.max) + 0.5)
+        if k and k >= 1 and k <= info.max then return pct / 100 / k, "talent" end
     end
     return S.RULES.mentalDexApPerInt / info.max, "rule"
+end
+
+-- Spell power per Intellect from ONE point of Mental Quickness. Same idea:
+-- the talent's text if we can read it, else 30% at max rank split evenly.
+-- Returns ratio per point, source.
+function S.MentalQuickRatio()
+    local info = S.Talent("MQ")
+    local maxPct = S.RULES.mentalQuickSpPerIntMax * 100
+    local step = maxPct / info.max
+    local text = ns.Talents and ns.Talents.Description("Mental Quickness")
+    local pct = text and tonumber(text:lower():match("(%d+)%% of your intellect"))
+    if pct then
+        -- The text shows one rank. Which one? The one whose number fits.
+        local k = math.floor(pct / step + 0.5)
+        if k >= 1 and k <= info.max and math.abs(pct - k * step) <= 1 then return pct / 100 / k, "talent" end
+        -- It doesn't fit the 30% rule. Trust the game: count it as your rank.
+        if info.real and info.real > 0 then return pct / 100 / info.real, "talent" end
+    end
+    return step / 100, "rule"
 end
 
 -- Points in each talent that the Sim Lab uses right now.
@@ -180,7 +204,8 @@ function S.Apply(p, add, opts)
 
     -- Mental Quickness: Intellect also gives spell damage and healing.
     local mq = opts.mentalQuick or 0
-    local spFromInt = (add.int or 0) * R.mentalQuickSpPerIntPerRank * mq
+    local mqPer = S.MentalQuickRatio()
+    local spFromInt = (add.int or 0) * mqPer * mq
     q.sp = {}
     for school, v in pairs(p.sp or {}) do q.sp[school] = v + (add.sp or 0) + spFromInt end
     q.source = "sim"
@@ -188,7 +213,7 @@ function S.Apply(p, add, opts)
     q.talentPoints = opts.talentPoints or p.talentPoints
     if spFromInt ~= 0 then
         note(("%s Intellect × %s%% × %d (Mental Quickness) = %s spell power and healing"):format(
-            f(add.int), f(R.mentalQuickSpPerIntPerRank * 100), mq, f(spFromInt, 1)))
+            f(add.int), f(mqPer * 100, 1), mq, f(spFromInt, 1)))
     end
 
     local apFromStr = (add.str or 0) * R.apPerStr

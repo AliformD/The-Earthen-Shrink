@@ -87,14 +87,14 @@ function ns.ImbueSettingRows(p)
     }
     rows[#rows + 1] = {
         icon = 136018, name = "Totem stacks with Windfury Weapon",
-        sub = set.wfStacks and "Yes · expected after the Nov 2026 hotfix" or "No · old rule: Windfury Weapon turns off the totem for you",
+        sub = set.wfStacks and "Yes · live since the shaman patch (Angel saw it)" or "No · old rule: Windfury Weapon turns off the totem for you",
         cols = { "", set.wfStacks and "Yes" or "No" },
         colColors = { nil, set.wfStacks and W.GREEN or W.GREY },
         onClick = function() IM.Slash("wfstack") end,
         tooltip = function(tt)
             tt:AddLine("Does Windfury Totem stack with Windfury Weapon?", 1, 1, 1)
-            tt:AddLine("The rank 1 tooltip says Windfury Weapon \"disables any benefit you personally receive from Windfury Totem\". A hotfix is changing that so both work. Only matters when Windfury Totem is on.", 1, 0.82, 0, true)
-            W.AddNote(tt, "Not tested in game yet: we assume each one rolls its own chance on every hit. Also: /es wfstack on|off")
+            tt:AddLine("Since the shaman patch both work for you (Angel saw it in game). The totem gives fewer extra attacks than the weapon buff, so read both tooltips. Only matters when Windfury Totem is on.", 1, 0.82, 0, true)
+            W.AddNote(tt, "🔶 We assume each one rolls its own chance on every hit. Also: /es wfstack on|off")
         end,
     }
     -- Flametongue Totem, and whether it stacks with Flametongue Weapon.
@@ -122,13 +122,13 @@ function ns.ImbueSettingRows(p)
     }
     rows[#rows + 1] = {
         icon = 135814, name = "Flametongue Totem stacks with the weapon buff",
-        sub = set.ftStacks and "Yes |cffff8000(unverified)|r · both add fire to every hit" or "No · the weapon buff replaces the totem's fire",
+        sub = set.ftStacks and "Yes · both add fire to every hit (Angel saw it after the patch)" or "No · the weapon buff replaces the totem's fire",
         cols = { "", set.ftStacks and "Yes" or "No" },
         colColors = { nil, set.ftStacks and W.GREEN or W.GREY },
         onClick = function() IM.Slash("ftstack") end,
         tooltip = function(tt)
             tt:AddLine("Do Flametongue Totem and Flametongue Weapon stack?", 1, 1, 1)
-            tt:AddLine("Blizzard's notes say weapon buffs stack with totems, using Windfury as the example. Nobody has checked Flametongue yet. If both show fire numbers on the same swing in game, they stack.", 1, 0.82, 0, true)
+            tt:AddLine("Since the shaman patch the totem that matches your weapon buff stacks with it (Angel saw it in game). But you only get ONE of Windfury Totem or Flametongue Totem, even if both are down.", 1, 0.82, 0, true)
             W.AddNote(tt, "Only matters when Flametongue Totem is on. Also: /es ftstack on|off")
         end,
     }
@@ -262,7 +262,17 @@ function T.Update(page)
     if ctx and ctx.removedRB then
         rows[#rows + 1] = { header = ("Rockbiter is on now: took its %d AP out of your stats for the test"):format(ctx.removedRB) }
     end
+    if ctx and ctx.bothTotems then
+        rows[#rows + 1] = { header = (ns.TotemTracker and ns.TotemTracker.wastedNow) and ("|cffff4a3aWindfury and Flametongue Totem are both down: only %s counts (dropped last).|r"):format(ns.TotemTracker.wastedNow.active)
+            or "|cffff4a3aWindfury Totem and Flametongue Totem are both on: a player only gets one (the one dropped last). Each buff counts the better one.|r" }
+    end
+    if ns.Setup then
+        for _, r in ipairs(ns.Setup.Rows(p)) do rows[#rows + 1] = r end
+    end
     for _, r in ipairs(ns.ImbueSettingRows(p)) do rows[#rows + 1] = r end
+    if ns.Setup then
+        for _, r in ipairs(ns.Setup.SettingRows()) do rows[#rows + 1] = r end
+    end
     for _, r in ipairs(ns.ProfileRows(p)) do rows[#rows + 1] = r end
     page.list:SetRows(rows)
 

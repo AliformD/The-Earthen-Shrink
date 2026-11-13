@@ -51,9 +51,18 @@ local function imbueData(key, rank)
     return nil
 end
 
+-- M.override: the "best setup" comparer (Math/Setup.lua) sets this for a
+-- moment to try totem plans without changing your settings.
+--   { wfTotem = true/false, ftTotem = true/false }
+M.override = nil
+local function totemOn(name)
+    if M.override then return M.override[name] and true or false end
+    return db()[name]
+end
+
 -- Windfury Totem in your group: its proc numbers, or nil + why not.
 function M.TotemProc(p)
-    if not db().wfTotem then return nil, "off" end
+    if not totemOn("wfTotem") then return nil, "off" end
     local rank = ns.SpellData.Best("WFT", p.level or 1, p)
     if not rank then return nil, "Windfury Totem isn't available at this level" end
     if not rank.imbue then return nil, "couldn't read the Windfury Totem tooltip" end
@@ -87,7 +96,7 @@ end
 
 -- Flametongue Totem in your group: fire per hit, or nil + why not.
 function M.FtTotem(p)
-    if not db().ftTotem then return nil, "off" end
+    if not totemOn("ftTotem") then return nil, "off" end
     local rank = ns.SpellData.Best("FTT", p.level or 1, p)
     if not rank then return nil, "Flametongue Totem isn't available at this level" end
     if not (rank.imbue and rank.imbue.min) then return nil, "couldn't read the Flametongue Totem tooltip" end
@@ -133,6 +142,74 @@ local function luckRange(swings, land, chance)
 end
 
 ---------------------------------------------------------------------------
+-- Totems in your group
+---------------------------------------------------------------------------
+-- The rules since the shaman patch (Angel, in game 2026-11-13):
+--   * Windfury Totem stacks with Windfury Weapon, and Flametongue Totem
+--     stacks with Flametongue Weapon (the totem that MATCHES your weapon
+--     buff adds on top of it). Settings: /es wfstack, /es ftstack.
+--   * But a player only gets ONE of Windfury Totem or Flametongue Totem,
+--     even with both on the ground. The game lets you drop both; one is
+--     simply wasted, for you and for your party.
+--   * When both are down, the one dropped LAST overwrites the other's buff
+--     (Angel, in game 2026-11-13). If the totem timer sees both of YOUR
+--     totems down, we count the one you dropped last. Otherwise (the
+--     settings only say "both in the group") we count the better one,
+--     because you'd drop that one last.
+
+-- Adds one totem plan to a copy of the buff. use = "WFT" or "FTT".
+-- Returns the new buff and the explanation line (or nil if it can't add).
+local function addTotem(ctx, key, buff, use)
+    local set, f = db(), ns.fmt
+    local b = { ap = buff.ap, onHit = buff.onHit, procs = {} }
+    for i, pr in ipairs(buff.procs or {}) do b.procs[i] = pr end
+    if use == "FTT" then
+        if key == "FT" and not set.ftStacks then
+            return b, { "Flametongue Totem", "|cffff4a3areplaced by the weapon buff (setting)|r" }
+        end
+        b.onHit = (b.onHit or 0) + ctx.ftTotemHit
+        return b, { "Flametongue Totem" .. (key == "FT" and " (stacks)" or ""), "+" .. f(ctx.ftTotem.perHit, 1) .. " fire per hit" }
+    elseif use == "WFT" then
+        if key == "WF" and not set.wfStacks then
+            return b, { "Windfury Totem", "|cffff4a3aturned off by this buff (setting)|r" }
+        end
+        b.procs[#b.procs + 1] = ctx.totem
+        return b, { "Windfury Totem" .. (key == "WF" and " (stacks)" or ""),
+            ("%s%% chance, %s extra attack%s"):format(f(ctx.totem.chance), f(ctx.totem.attacks), ctx.totem.attacks == 1 and "" or "s") }
+    end
+    return b
+end
+
+-- Damage of one swing with this buff AND the group's totems.
+-- key = weapon buff key, or nil for "no weapon buff". L = lines to add to.
+-- Returns damage per swing, and which totem was counted ("WFT"/"FTT"/nil).
+function M.WithTotems(p, ctx, key, buff, L)
+    local options = {}
+    if ctx.totem then options[#options + 1] = "WFT" end
+    if ctx.ftTotem then options[#options + 1] = "FTT" end
+    if #options == 0 then return M.Swing(p, ctx, buff), nil end
+    -- Both down for real: the last one dropped is the only one that counts.
+    local live = ctx.bothTotems and ns.TotemTracker and ns.TotemTracker.wastedNow
+    if live then options = { live.activeKey } end
+    local best, bestUse, bestLine
+    for _, use in ipairs(options) do
+        local b, line = addTotem(ctx, key, buff, use)
+        local dmg = M.Swing(p, ctx, b)
+        if not best or dmg > best then best, bestUse, bestLine = dmg, use, line end
+    end
+    if L then
+        if bestLine then L[#L + 1] = bestLine end
+        if ctx.bothTotems then
+            local name = bestUse == "WFT" and "Windfury Totem" or "Flametongue Totem"
+            L[#L + 1] = live
+                and ("|cffff4a3aBoth Windfury and Flametongue Totem are on: you only get one.|r Counted: %s (you dropped it last, so its buff overwrote the other)."):format(name)
+                or ("|cffff4a3aBoth Windfury and Flametongue Totem are on: you only get one.|r Counted: %s (the better one here; the totem dropped last wins, so drop this one last)."):format(name)
+        end
+    end
+    return best, bestUse
+end
+
+---------------------------------------------------------------------------
 -- Compare all buffs
 ---------------------------------------------------------------------------
 
@@ -162,9 +239,9 @@ function M.Compare(p)
         ctx.totem, ctx.totemWhy = M.TotemProc(p)
         ctx.ftTotem, ctx.ftTotemWhy = M.FtTotem(p)
         ctx.ftTotemHit = ctx.ftTotem and ctx.ftTotem.perHit * ctx.fireCrit or 0
-        local none = { procs = {}, onHit = ctx.ftTotemHit }
-        if ctx.totem then none.procs[1] = ctx.totem end
-        ctx.base = M.Swing(p, ctx, none)
+        ctx.bothTotems = ctx.totem ~= nil and ctx.ftTotem ~= nil
+        -- No weapon buff: the swing with the group's totem(s) only.
+        ctx.base = M.WithTotems(p, ctx, nil, { procs = {} })
     end
     M.lastCtx = ctx
 
@@ -245,28 +322,8 @@ function M.CalcOne(key, im, p, ctx)
         plain = ("%s%% chance of %s extra attacks"):format(f(im.chance), f(im.attacks))
     end
 
-    -- Flametongue Totem: adds its fire to every buff, except maybe
-    -- Flametongue Weapon (🔶 unverified whether the two stack).
-    if ctx.ftTotem then
-        if key ~= "FT" or set.ftStacks then
-            buff.onHit = (buff.onHit or 0) + ctx.ftTotemHit
-            if key == "FT" then L[#L + 1] = { "Flametongue Totem", "stacks (setting) +" .. f(ctx.ftTotem.perHit, 1) .. " fire" } end
-        else
-            L[#L + 1] = { "Flametongue Totem", "|cffff4a3areplaced by the weapon buff (setting)|r" }
-        end
-    end
-
-    -- Windfury Totem: works with every buff except (maybe) Windfury Weapon.
-    if ctx.totem then
-        if key ~= "WF" or set.wfStacks then
-            buff.procs[#buff.procs + 1] = ctx.totem
-            if key == "WF" then L[#L + 1] = { "Windfury Totem", "stacks (setting)" } end
-        else
-            L[#L + 1] = { "Windfury Totem", "|cffff4a3aturned off by this buff|r" }
-        end
-    end
-
-    local per = M.Swing(p, ctx, buff)
+    -- The group's totems (see M.WithTotems for the rules).
+    local per = M.WithTotems(p, ctx, key, buff, L)
     local c = { lines = L }
     c.perSwing = per - ctx.base
     c.total = c.perSwing * swings

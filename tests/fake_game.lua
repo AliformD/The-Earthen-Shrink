@@ -594,10 +594,11 @@ assert(ns.SimMath.Talent("MD").points == 2, "Mental Dexterity 2/3 read from tale
 local p0 = ns.Profile.Player()
 local q0 = ns.SimMath.Apply(p0, { int = 100 }, { mentalQuick = 1 })
 print("+100 Int with 1 point: SP", p0.sp.Nature, "->", q0.sp.Nature, "healing", p0.healing, "->", q0.healing)
-assert(math.abs(q0.sp.Nature - p0.sp.Nature - 15) < 1e-9 and math.abs(q0.healing - p0.healing - 15) < 1e-9)
--- Mental Dexterity: 150% split over 3 points (rule) -> 2 points = 1.0 AP per Int
-local q1 = ns.SimMath.Apply(p0, { int = 10 }, { mentalDex = 2 })
-assert(math.abs(q1.ap - p0.ap - 10) < 1e-9, "2 points of MD: 10 Int = 10 AP")
+-- Patch rule (Angel 2026-11-13): 30% at max rank, split over 5 ranks here = 6% per point
+assert(math.abs(q0.sp.Nature - p0.sp.Nature - 6) < 1e-9 and math.abs(q0.healing - p0.healing - 6) < 1e-9)
+-- Mental Dexterity: 100% split over 3 points (patch rule) -> 2 points = 0.667 AP per Int
+local q1 = ns.SimMath.Apply(p0, { int = 30 }, { mentalDex = 2 })
+assert(math.abs(q1.ap - p0.ap - 20) < 1e-9, "2 points of MD: 30 Int = 20 AP")
 -- Test another build with the slider, then go back to real
 ns.UI.Update()
 sim.talents.MQ:Set(2, true)  -- (the fake slider has no memory, so set it directly)
@@ -893,3 +894,91 @@ SlashCmdList.THEEARTHENSHRINK("totemtest")
 SlashCmdList.THEEARTHENSHRINK("totemtest clear")
 assert(not TT.Summary("MST"))
 print("totem timer tests passed")
+
+-- Shaman patch (2026-11-13) ------------------------------------------------------
+-- Windfury Totem tooltip: "an extra attack" / no number at all -> 1 for the totem
+local SD = ns.SpellData
+assert(SD.ParseImbue("WFT", "Party members' melee attacks have a 20% chance of granting an extra attack with 122 extra attack power.").attacks == 1)
+assert(SD.ParseImbue("WFT", "Each hit has a 20% chance of an additional attack with 122 attack power.").attacks == 1)
+assert(SD.ParseImbue("WFT", "Each hit has a 20% chance of more attacks with 122 attack power.").attacks == 1, "totem default = 1")
+assert(SD.ParseImbue("WF", "Each hit has a 20% chance of more attacks with 122 attack power.").attacks == 2, "weapon default = 2")
+
+-- Only one of Windfury / Flametongue Totem counts
+local function dpsBy()
+  local out = {}
+  for _, e in ipairs(ns.ImbueMath.Compare(ns.Profile.Player())) do out[e.key] = e.calc end
+  return out, ns.ImbueMath.lastCtx
+end
+SlashCmdList.THEEARTHENSHRINK("wftotem on")
+local onlyWF, cW = dpsBy()
+SlashCmdList.THEEARTHENSHRINK("wftotem off"); SlashCmdList.THEEARTHENSHRINK("fttotem on")
+local onlyFT, cF = dpsBy()
+SlashCmdList.THEEARTHENSHRINK("wftotem on")
+local both, cB = dpsBy()
+assert(cB.bothTotems)
+for _, k in ipairs({ "RB", "FT", "FB", "WF" }) do
+  local wfTot = cW.base + onlyWF[k].perSwing
+  local ftTot = cF.base + onlyFT[k].perSwing
+  local bTot = cB.base + both[k].perSwing
+  print(("both totems on, %s: per swing WFT %.2f, FTT %.2f, counted %.2f"):format(k, wfTot, ftTot, bTot))
+  assert(math.abs(bTot - math.max(wfTot, ftTot)) < 1e-6, "both on = only the better one counts")
+end
+local warned = false
+for _, l in ipairs(both.WF.lines) do if type(l) == "string" and l:find("you only get one") then warned = true end end
+assert(warned, "the math says only one counts")
+SlashCmdList.THEEARTHENSHRINK("wftotem off"); SlashCmdList.THEEARTHENSHRINK("fttotem off")
+
+-- Stormstrike fallback is the patch value now
+assert(ns.SpellMath.RULES.strikePct == 1.0 and ns.Rotation.RULES.strikeCooldown == 8)
+
+-- Best setup
+C_Spell.GetSpellName = function(id) return ({ [8512] = "Windfury Totem", [8227] = "Flametongue Totem", [3599] = "Searing Totem", [8190] = "Magma Totem" })[id] end
+local SU = ns.Setup
+SlashCmdList.THEEARTHENSHRINK("aoe 1")
+local list = SU.Compare(ns.Profile.Player())
+assert(#list > 0)
+for _, e in ipairs(list) do
+  assert(not e.plan.aoe, "no Magma with 1 enemy")
+  print(("  setup 1 enemy: %-55s solo %.1f group %.1f (each melee +%.1f)"):format(SU.Label(e), e.solo, e.group, e.member))
+end
+SlashCmdList.THEEARTHENSHRINK("aoe 4")
+local list4 = SU.Compare(ns.Profile.Player())
+local sawMagma = false
+for _, e in ipairs(list4) do if e.plan.fire == "MT" then sawMagma = true end end
+assert(sawMagma, "Magma plans tested with 4 enemies")
+print("  best with 4 enemies:", SU.Label(list4[1]))
+SlashCmdList.THEEARTHENSHRINK("aoe 1")
+assert(not ns.ImbueMath.override, "override cleared")
+SlashCmdList.THEEARTHENSHRINK("weapon")
+ns.UI.Update()
+SlashCmdList.THEEARTHENSHRINK("setup")
+
+-- Wasted totem warning
+TOTEMS = {}
+drop(4, 8512, "Windfury Totem")
+assert(not TT.wastedNow)
+step(1)
+drop(1, 8227, "Flametongue Totem")
+-- Flametongue dropped last: its buff overwrote Windfury's (Angel, in game)
+assert(TT.wastedNow and TT.wastedNow.active == "Flametongue Totem" and TT.wastedNow.drop == "Windfury Totem", "last dropped wins")
+assert(not TT.wastedNow.bestIsActive, "no weapon buff on: Windfury Totem is the better keep")
+SlashCmdList.THEEARTHENSHRINK("totems")
+ns.UI.Update()
+print("totems tab:", tp.logLine._text)
+assert(tp.logLine._text:find("Active: Flametongue Totem"))
+-- The math counts only the active one when both settings are on
+SlashCmdList.THEEARTHENSHRINK("wftotem on"); SlashCmdList.THEEARTHENSHRINK("fttotem on")
+local liveFT = dpsBy()
+assert(math.abs(liveFT.RB.perSwing - onlyFT.RB.perSwing) < 1e-6, "both down, FT last: counts Flametongue Totem")
+-- Re-drop Windfury Totem: now it is active and Flametongue is wasted
+step(1)
+drop(4, 8512, "Windfury Totem")
+assert(TT.wastedNow.active == "Windfury Totem" and TT.wastedNow.drop == "Flametongue Totem" and TT.wastedNow.bestIsActive)
+local liveWF = dpsBy()
+assert(math.abs(liveWF.RB.perSwing - onlyWF.RB.perSwing) < 1e-6, "WF dropped last: counts Windfury Totem")
+SlashCmdList.THEEARTHENSHRINK("wftotem off"); SlashCmdList.THEEARTHENSHRINK("fttotem off")
+ns.UI.Update()
+print("totems tab:", tp.logLine._text)
+drop(1, 3599, "Searing Totem")
+assert(not TT.wastedNow, "Searing replaced Flametongue: fine again")
+print("shaman patch tests passed")

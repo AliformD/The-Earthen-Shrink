@@ -69,6 +69,9 @@ local function updateBar(b)
     -- Mana totems turn green once they've paid for themselves.
     local paid = rec.payoffTicks and ((rec.ticks or 0) >= rec.payoffTicks or (rec.payoffSec and age >= rec.payoffSec))
     if paid then col = W.GREEN end
+    -- Red: this totem is wasted (Windfury + Flametongue Totem both down).
+    local wasted = TR().wastedNow
+    if wasted and rec.name == wasted.drop then col = { 1, 0.2, 0.15 } end
     b.bar:SetStatusBarColor(col[1], col[2], col[3])
     -- A white line on the bar where it pays off.
     if dur and rec.payoffSec and rec.payoffSec < dur then
@@ -79,6 +82,7 @@ local function updateBar(b)
         b.mark:Hide()
     end
     local short = rec.name:gsub(" Totem$", "")
+    if wasted and rec.name == wasted.drop then short = "|cffff4a3a" .. short .. " (wasted)|r" end
     b.label:SetText(short)
     local txt = left and (ns.fmt(left, 0) .. "s") or (ns.fmt(age, 0) .. "s")
     if rec.payoffTicks then txt = ("%d/%d ticks · %s"):format(rec.ticks or 0, rec.payoffTicks, txt) end
@@ -167,6 +171,13 @@ end
 
 function T.UpdateLive(page)
     for _, b in ipairs(page.bars) do updateBar(b) end
+    local wasted = TR().wastedNow
+    if wasted then
+        page.logLine:SetText(wasted.bestIsActive
+            and ("|cffff4a3aActive: %s (dropped last). %s is wasted: swap it.|r"):format(wasted.active, wasted.drop)
+            or ("|cffff4a3aActive: %s (dropped last). %s is wasted. Better: drop %s again.|r"):format(wasted.active, wasted.drop, wasted.best))
+        return
+    end
     local line = TR().ShortLine("MST")
     page.logLine:SetText("|cff3fc7ebMana Spring:|r " .. (line or "no drops logged yet. Drop one and the timer starts on its own."))
 end
