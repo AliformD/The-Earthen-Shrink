@@ -231,7 +231,7 @@ function P.FromGear(unit, info)
     local mq = p.isShaman and ns.Talents and ns.Talents.Rank("Mental Quickness", unit) or nil
     local spInt = 0
     if mq and mq > 0 then
-        spInt = int * ns.SimMath.RULES.mentalQuickSpPerIntPerRank * mq
+        spInt = int * ns.SimMath.MentalQuickRatio() * mq
         p.estimated.sp = true   -- their total Intellect is an estimate
     end
     p.mentalQuick, p.spFromGear, p.spFromInt = mq, spGear, spInt

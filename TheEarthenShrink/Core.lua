@@ -6,7 +6,7 @@
 -- Think of it like a static class in C# that every file can add methods to.
 
 local ADDON, ns = ...
-ns.VERSION = "0.13.0"
+ns.VERSION = "0.14.0"
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -81,14 +81,22 @@ local DEFAULTS = {
     -- Weapon buff comparison settings (change them on the Weapon Buffs tab).
     -- Is a Shaman putting down Windfury Totem in your group?
     wfTotem = false,
-    -- Do Windfury Totem and Windfury Weapon both work at once? The tooltip
-    -- says no, but a hotfix (Nov 2026) is changing it so they stack.
+    -- Do Windfury Totem and Windfury Weapon both work at once? Yes since
+    -- the shaman patch (Angel, in game 2026-11-13).
     wfStacks = true,
     -- Is Flametongue Totem down in your group? And does it stack with
-    -- Flametongue Weapon? 🔶 Blizzard's notes say weapon buffs stack with
-    -- totems (Windfury was the example); not tested for Flametongue.
+    -- Flametongue Weapon? Yes: the totem matching your weapon buff stacks
+    -- (Angel, in game 2026-11-13). But you only get ONE of Windfury Totem
+    -- or Flametongue Totem (see Math/Imbues.lua, M.WithTotems).
     ftTotem = false,
     ftStacks = true,
+    -- Best setup comparer (Math/Setup.lua): enemies in the fight (1 = one
+    -- target; 2+ also tests Magma Totem) and other melee in your party.
+    setupTargets = 1,
+    groupMelee = 3,
+    -- Warn when Windfury Totem and Flametongue Totem are both down (one is
+    -- wasted). Switch with /es wastedwarn.
+    wastedWarn = true,
     -- 🔶 UNVERIFIED: how much of your Fire spell power Flametongue adds to
     -- each hit (0.1 = 10%). 0 until someone tests it in Forever.
     ftCoef = 0,
@@ -214,6 +222,10 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
         ns.Windfury.Slash(msg:match("^sound%s+(%a+)"))
     elseif msg:match("^wftotem") or msg:match("^wfstack") or msg:match("^fttotem") or msg:match("^ftstack") or msg:match("^ftcoef") or msg:match("^swings") then
         ns.ImbueMath.Slash(msg)
+    elseif msg == "setup" or msg:match("^aoe%s") or msg:match("^groupmelee%s") then
+        ns.Setup.Slash(msg)
+    elseif msg == "wastedwarn" or msg:match("^wastedwarn%s") then
+        ns.TotemTracker.WastedSlash(msg:match("^wastedwarn%s+(%a+)"))
     elseif msg == "minimap" or msg:match("^minimap%s") then
         ns.Minimap.Slash(msg:match("^minimap%s+(%a+)"))
     elseif msg == "totemtest" or msg:match("^totemtest%s") then
@@ -223,6 +235,6 @@ SlashCmdList.THEEARTHENSHRINK = function(msg)
     elseif msg == "check" then
         ns.SpellData.PrintCheck()
     else
-        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es changes, /es talents, /es inspect, /es check, /es minimap, /es minimap reset, /es sound, /es sound test, /es totemtest, /es totemtest clear, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es fttotem on|off, /es ftstack on|off, /es ftcoef 0.1, /es swings 50")
+        ns.say("commands: /es (open), /es spells, /es weapon, /es totems, /es healing, /es sim, /es test, /es meter, /es changes, /es talents, /es inspect, /es check, /es minimap, /es minimap reset, /es sound, /es sound test, /es totemtest, /es totemtest clear, /es sptooltip on|off, /es wftotem on|off, /es wfstack on|off, /es fttotem on|off, /es ftstack on|off, /es ftcoef 0.1, /es swings 50, /es setup, /es aoe 3, /es groupmelee 2, /es wastedwarn on|off")
     end
 end

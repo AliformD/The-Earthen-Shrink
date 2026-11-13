@@ -66,7 +66,7 @@ Adding these up gives roughly **0.05 to 0.10 DPS per spell power**.
 | Strength | ≈ 0.20 | 1.0 |
 | Spell power | ≈ 0.05 to 0.10 | **≈ 0.25 to 0.5** |
 
-So **1 spell power ≈ ¼ to ½ of a Strength** right now. Angel is right that it should be low. Once you get Maelstrom Weapon (its proc chance was doubled in the Nov 2 notes 🟡), free instant Lightning Bolts make spell power worth a lot more. The addon should then recalculate.
+So **1 spell power ≈ ¼ to ½ of a Strength** right now. Angel is right that it should be low. Once you get Maelstrom Weapon (its proc chance was LOWERED in the live shaman patch, Angel 2026-11-13; read the tooltip), free instant Lightning Bolts make spell power worth a lot more. The addon should then recalculate.
 
 ---
 
